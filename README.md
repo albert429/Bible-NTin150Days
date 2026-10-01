@@ -1,62 +1,52 @@
 # العهد الجديد بالترتيب الزمني
 
-An Arabic-first, chronological New Testament reading app: 150 days, personal start dates, no password, and private group check-ins.
+A frontend-only Arabic New Testament reading app with the supplied 150-day chronological plan. React + TypeScript + Vite. No backend, database, credentials, or environment variables are required.
 
-## Run locally
+## Run
 
-Requires Node.js 22 or newer and npm.
+Node.js 22:
 
 ```sh
 npm install
 npm run dev
-```
-
-Open http://localhost:5173. The Vite frontend proxies `/api` to Express on port 3001.
-
-```sh
 npm test
 npm run build
 npm start
 ```
 
-The production server serves both the built React app and API on port 3001. Set `PORT` and `DB_PATH` to override defaults. Keep the SQLite database on persistent storage; back it up using SQLite's backup API (or stop the server before copying the database and WAL files). Use HTTPS in a deployment because device credentials grant access to progress. No hosted service is configured or deployed.
+`npm run dev` opens a development server on port 5173. `npm start` previews the production build on port 4173. The predev/prebuild scripts generate 150 daily JSON files and a small plan index in `public/readings/`; Vite includes them in `dist/`.
 
-## Experience
+## Deploy on Vercel
 
-- Browse the entire plan before joining. Starting at the root creates your own group; share the invitation from “مجموعتي” to bring others into it.
-- Enter a name and start date once. Names need not be unique; short member IDs distinguish people with the same name in activity.
-- Arabic RTL reading with locally bundled Amiri and Noto Sans Arabic fonts, verse numbers, source section headings, 22–38px text size, dark mode and focus mode. The reading area uses the full workspace, with navigation in a collapsible drawer and an expandable passage index.
-- Calendar dates follow Cairo time. Catch-up and advance readings never move the schedule. Future start dates are supported.
-- A completion is idempotent and can be undone. Group activity shows check-ins made today, including readings for other days, and refreshes every 30 seconds.
-- Device credentials are stored in localStorage; only their SHA-256 hashes are stored on the server. Each progress write is scoped to the credential's member.
-- Settings contains a private recovery link. Open it on another device to restore access; its secret is removed from the address bar immediately. Keep it private: it authorizes access to the member's name and progress. This version does not provide credential revocation or password-based recovery.
-- Invites and recovery links are different. Reading data is public; group activity requires membership. Existing members retain their group when opening another invitation.
+Import the GitHub repository, choose the **Vite** preset, use **npm run build**, and set the output directory to **dist**. The checked-in `vercel.json` supplies these defaults. Pushes to the connected branch trigger redeployment. No `/api` routes, serverless functions, Neon account, database, or paid plan are needed for this version.
+
+Verify `/readings/plan.json` and `/readings/1.json` return JSON after deployment. If they do not, check that the deployment built the latest commit using the complete `npm run build` command (which runs `prebuild`), not `vite build` alone.
+
+## Reading and progress
+
+- Read all 150 days in their original passage order, with Arabic verse numbers, source headings, Amiri typography, 22–38px text, and light/dark modes.
+- The main workspace prioritizes Scripture. Navigation is in a drawer; the passage index expands on demand.
+- Each reader selects a personal start date. Calendar dates use Cairo time. Catch-up and advance readings never shift the schedule.
+- Progress is stored only in the current browser's localStorage under `nt-reading-progress-v1`. It survives refreshes and ordinary browser restarts. Clearing site data, private browsing cleanup, changing browsers, or changing the site's domain does not preserve that browser's progress.
+- Multiple readers can use the same browser. Switching readers preserves each profile, including duplicate names.
+- Settings allows downloading a JSON backup and restoring it on another browser. A backup is a snapshot, not a sync link. Imports create a separate profile and do not overwrite existing progress. Keep backups private because they contain the reader's name, start date, and completed days.
+- There is no live group activity or automatic device synchronization. Readers can copy a completion message or choose to open WhatsApp to share it themselves. Site links share only the public reading app.
+- Existing server-based device tokens/recovery links from the earlier implementation are not usable in this version. Local SQLite files are left untouched and remain excluded from Git. Previously saved server progress is not automatically migrated.
+- Bible files are static but still require a network connection when first fetched. This is not an offline/PWA implementation.
 
 ## Source and import
 
-The supplied `New_Testament_150_Day_Arabic.docx` is the authority for reading order. Its original table text is retained in `data/source-plan.json`; the importer explicitly normalizes the document's reversed RTL range notation rather than guessing with browser rendering.
+The user-supplied `New_Testament_150_Day_Arabic.docx` is the authority for passage order. Original table text is retained in `data/source-plan.json`. The importer normalizes its reversed RTL range notation.
 
-Bible text: [Arabic Van Dyck, eBible.org](https://ebible.org/bible/details.php?id=arb-vd), marked public domain by the publisher. Download: https://ebible.org/Scriptures/arb-vd_usfm.zip. Text wording and source headings are retained. USFM presentation markers are removed.
-
-To regenerate:
+Bible source: [Arabic Van Dyck, eBible.org](https://ebible.org/bible/details.php?id=arb-vd), identified as public domain. Scripture wording and section headings are preserved; presentation markers are removed.
 
 ```sh
 python3 scripts/extract-plan.py /path/to/New_Testament_150_Day_Arabic.docx
 curl -L --fail https://ebible.org/Scriptures/arb-vd_usfm.zip -o /tmp/arb-vd.zip
 python3 scripts/import.py /tmp/arb-vd.zip
+npm run build
 ```
 
-Validated: 150 days, 537 passages, 7,966 verse occurrences, all 7,959 unique verses in the source New Testament. Seven repeats are present in the supplied plan and intentionally retained. All 27 books and 260 chapters are represented. Imported data is bundled; Bible reading does not call a third-party service at runtime.
+Validation: 150 days, 537 passages, 7,966 verse occurrences, and all 7,959 unique verses in this source New Testament. Seven repeated verses from the original plan are intentionally retained. All 27 books and 260 chapters are represented.
 
-Tests cover all daily payloads and ranges, Cairo midnight/DST and leap-date handling, invalid dates, duplicate names, credential isolation, private group activity, invalid invites, catch-up, advance readings, idempotency, undo and recovery credentials.
-
-## Project layout
-
-- `src/main.tsx`, `src/styles.css`: React UI and responsive reading design.
-- `server/app.js`: Express routes, SQLite storage and member authorization.
-- `server/dates.js`: Cairo date helpers.
-- `data/plan.json`: validated passages and Bible text.
-- `scripts/`: reproducible import tools.
-- `tests/`: integration and date checks.
-
-This version has an in-app calendar, as planned; it does not connect to Google/Outlook calendars or send WhatsApp messages. Group sharing requires deploying the server at a URL reachable by group members.
+Tests verify exact static passage fidelity, saved progress, duplicate names, catch-up, undo, switching readers, backup restoration, malformed data, date validation, and storage failures.

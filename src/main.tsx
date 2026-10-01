@@ -20,8 +20,21 @@ import {
   Menu,
   Settings,
   RotateCcw,
+  Download,
+  Upload,
 } from "lucide-react";
 import "./styles.css";
+import {
+  currentReader,
+  createReader,
+  setCompletion,
+  loadProgress,
+  selectReader,
+  exportBackup,
+  importBackup,
+  PROGRESS_KEY,
+  type Reader,
+} from "./progress";
 type Verse = { number: number; text: string; heading?: string };
 type Passage = {
   book: string;
@@ -31,18 +44,7 @@ type Passage = {
   verses?: Verse[];
 };
 type Day = { day: number; verseCount: number; passages: Passage[] };
-type Member = {
-  id: string;
-  name: string;
-  startDate: string;
-  invite: string;
-  completed: number[];
-  today: string;
-};
-type Activity = {
-  members: number;
-  entries: { id: string; name: string; day: number; completed_at: string }[];
-};
+type Member = Reader;
 const ar = (n: number) =>
   new Intl.NumberFormat("ar-EG", { useGrouping: false }).format(n);
 const today = () =>
@@ -80,15 +82,8 @@ function saveStored(key: string, value: string) {
     localStorage.setItem(key, value);
   } catch {}
 }
-const initialRecovery = new URLSearchParams(location.hash.slice(1)).get(
-  "recover",
-);
-if (initialRecovery) {
-  saveStored("word-token", initialRecovery);
-  history.replaceState(null, "", location.pathname + location.search);
-}
 function App() {
-  const [token, setToken] = useState(readStored("word-token", ""));
+  const [profiles, setProfiles] = useState<Reader[]>([]);
   const [member, setMember] = useState<Member | null>(null);
   const [plan, setPlan] = useState<Day[]>([]);
   const [reading, setReading] = useState<Day | null>(null);
@@ -103,38 +98,54 @@ function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [activity, setActivity] = useState<Activity>({
-    members: 0,
-    entries: [],
-  });
   const [page, setPage] = useState(0);
   const [currentDate, setCurrentDate] = useState(today());
   const [linkText, setLinkText] = useState("");
   const [loading, setLoading] = useState(true);
-  const invite = new URLSearchParams(location.search).get("invite") || "";
+  const importInput = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const menuDialog = useRef<HTMLDialogElement>(null);
-  async function api(path: string, options: RequestInit = {}) {
-    const r = await fetch("/api" + path, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: "Bearer " + token } : {}),
-        ...options.headers,
-      },
-    });
-    const data = await r.json();
-    if (!r.ok) throw Error(data.error || "تعذر الاتصال. حاول مرة أخرى.");
-    return data;
+  function applyReader(reader: Reader | null) {
+    setMember(reader);
+    setProfiles(loadProgress(localStorage).profiles);
+    const n = reader
+      ? Math.max(1, Math.min(150, dayIndex(reader.startDate, today())))
+      : 1;
+    setSelected(n);
+    setPage(Math.floor((n - 1) / 30));
   }
-  async function refresh() {
-    const m = await api("/me");
-    setMember(m);
-    setCurrentDate(m.today);
-    return m as Member;
+  function backup() {
+    if (!member) return;
+    const url = URL.createObjectURL(
+      new Blob([exportBackup(member)], { type: "application/json" }),
+    );
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "nt-reading-backup-" + today() + ".json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setNotice("تم تجهيز النسخة الاحتياطية للتنزيل.");
+  }
+  async function restore(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      if (file.size > 65536)
+        throw Error("اختر ملف نسخة احتياطية صغيرًا بصيغة JSON.");
+      const reader = importBackup(localStorage, await file.text());
+      applyReader(reader);
+      setModal("");
+      setView("read");
+      setError("");
+      setNotice("تمت الاستعادة كقارئ منفصل. لم تُحذف أي قراءة سابقة.");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      event.target.value = "";
+    }
   }
   useEffect(() => {
-    fetch("/api/plan")
+    fetch("/readings/plan.json")
       .then((r) => {
         if (!r.ok) throw Error("تعذر تحميل الخطة");
         return r.json();
@@ -143,35 +154,30 @@ function App() {
       .catch((e) => setError(e.message));
   }, []);
   useEffect(() => {
-    let active = true;
-    setLoading(true);
-    if (!token) {
+    try {
+      applyReader(currentReader(localStorage));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
       setLoading(false);
-      return;
     }
-    api("/me")
-      .then((m: Member) => {
-        if (!active) return;
-        setMember(m);
-        setCurrentDate(m.today);
-        const n = Math.max(1, Math.min(150, dayIndex(m.startDate, m.today)));
-        setSelected(n);
-        setPage(Math.floor((n - 1) / 30));
-      })
-      .catch((e) => {
-        if (active) setError(e.message);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
+    const sync = (event: StorageEvent) => {
+      if (event.key === PROGRESS_KEY || event.key === null) {
+        try {
+          setMember(currentReader(localStorage));
+          setProfiles(loadProgress(localStorage).profiles);
+        } catch (e) {
+          setError((e as Error).message);
+        }
+      }
     };
-  }, [token]);
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
+  }, []);
   useEffect(() => {
     const controller = new AbortController();
     setReading(null);
-    fetch("/api/readings/" + selected, { signal: controller.signal })
+    fetch("/readings/" + selected + ".json", { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw Error("تعذر تحميل القراءة");
         return r.json();
@@ -182,22 +188,6 @@ function App() {
       });
     return () => controller.abort();
   }, [selected]);
-  useEffect(() => {
-    if (!token) return;
-    let active = true;
-    const get = () =>
-      api("/activity")
-        .then((a) => {
-          if (active) setActivity(a);
-        })
-        .catch(() => {});
-    get();
-    const t = setInterval(get, 30000);
-    return () => {
-      active = false;
-      clearInterval(t);
-    };
-  }, [token, member?.completed.join(",")]);
   useEffect(() => {
     const t = setInterval(() => setCurrentDate(today()), 30000);
     return () => clearInterval(t);
@@ -236,11 +226,8 @@ function App() {
     setBusy(true);
     setError("");
     try {
-      await api("/completions/" + selected, {
-        method: "PUT",
-        body: JSON.stringify({ completed: !done }),
-      });
-      await refresh();
+      setMember(setCompletion(localStorage, member.id, selected, !done));
+      setProfiles(loadProgress(localStorage).profiles);
       setNotice(
         done
           ? "تم التراجع عن إتمام القراءة"
@@ -258,16 +245,13 @@ function App() {
     setBusy(true);
     setError("");
     try {
-      const result = await api("/join", {
-        method: "POST",
-        body: JSON.stringify({
-          name: data.get("name"),
-          startDate: data.get("start"),
-          invite: invite || undefined,
-        }),
-      });
-      saveStored("word-token", result.token);
-      setToken(result.token);
+      applyReader(
+        createReader(
+          localStorage,
+          String(data.get("name") || ""),
+          String(data.get("start") || ""),
+        ),
+      );
       setModal("");
       setNotice("أهلًا بك! بدأت رحلتك، وحُفظت على هذا الجهاز.");
     } catch (e) {
@@ -277,23 +261,23 @@ function App() {
     }
   }
   function showLink(kind: string) {
-    if (!member) {
+    if (kind === "checkin" && !member) {
       setModal("join");
       return;
     }
     setLinkText(
-      location.origin +
-        location.pathname +
-        (kind === "invite" ? "?invite=" + member.invite : "#recover=" + token),
+      kind === "checkin"
+        ? `${member!.name}: تمت قراءة اليوم ${ar(selected)} ✓\n${location.origin}${location.pathname}`
+        : location.origin + location.pathname,
     );
     setModal(kind);
   }
   async function copy() {
     try {
       await navigator.clipboard.writeText(linkText);
-      setNotice("تم نسخ الرابط");
+      setNotice("تم النسخ");
     } catch {
-      setNotice("يمكنك تحديد الرابط ونسخه من الحقل.");
+      setNotice("يمكنك تحديد النص ونسخه من الحقل.");
     }
   }
   const Nav = () => (
@@ -327,10 +311,7 @@ function App() {
         }}
       >
         <Users size={20} />
-        مجموعتي
-        {activity.members > 0 && (
-          <span className="nav-count">{ar(activity.members)}</span>
-        )}
+        مشاركة القراءة
       </button>
     </>
   );
@@ -477,16 +458,18 @@ function App() {
                     <span className="olive-dot" />
                     ١٥٠ يومًا · بالترتيب الزمني
                   </div>
-                  <h1>{view === "calendar" ? "خطة القراءة" : "مجموعتي"}</h1>
+                  <h1>
+                    {view === "calendar" ? "خطة القراءة" : "مشاركة القراءة"}
+                  </h1>
                   <p>
                     {view === "calendar"
                       ? "تابع الأيام المكتملة، وعُد إلى أي قراءة."
-                      : "قراءات أعضاء مجموعتك اليوم."}
+                      : "شارك رابط القراءة أو أرسل إتمامك إلى مجموعتك."}
                   </p>
                 </div>
                 {!member ? (
                   <button className="primary" onClick={() => setModal("join")}>
-                    {invite ? "انضم إلى المجموعة" : "ابدأ رحلتك"}
+                    ابدأ رحلتك
                     <ArrowLeft size={17} />
                   </button>
                 ) : (
@@ -807,71 +790,46 @@ function App() {
               </section>
             ) : (
               <section className="group-panel">
-                <div className="group-heading">
-                  <span className="large-icon">
-                    <Users size={30} />
-                  </span>
-                  <h2>رفقاء الرحلة</h2>
-                  <p>
-                    {member
-                      ? `${ar(activity.members)} في المجموعة · لكل شخص موعد بدايته`
-                      : "ادعُ أصدقاءك ليشاركوك القراءة، كلٌّ في وقته."}
-                  </p>
+                <h2>مشاركة القراءة</h2>
+                <p className="local-explanation">
+                  تقدمك محفوظ في هذا المتصفح فقط. لا توجد مزامنة بين الأجهزة أو
+                  قائمة مباشرة بقراءات المجموعة في هذه النسخة.
+                </p>
+                <div className="share-actions">
                   <button
-                    className="primary"
+                    className="quiet-button"
                     onClick={() => showLink("invite")}
                   >
-                    <Link size={17} />
-                    دعوة صديق
+                    <Link size={18} />
+                    مشاركة رابط الموقع
+                  </button>
+                  <button
+                    className="primary"
+                    disabled={!done}
+                    onClick={() => showLink("checkin")}
+                  >
+                    <Check size={18} />
+                    مشاركة إتمام اليوم {ar(selected)}
                   </button>
                 </div>
-                <div className="activity-heading">
-                  <h3>قراءات المجموعة اليوم</h3>
-                  <span>{dateLabel(currentDate)}</span>
-                </div>
-                {activity.entries.length ? (
-                  <ul className="activity-list">
-                    {activity.entries.map((e) => (
-                      <li key={e.id + "-" + e.day}>
-                        <span className="avatar">{e.name.charAt(0)}</span>
-                        <span>
-                          <strong>
-                            {e.name}
-                            {e.id === member?.id ? " (أنت)" : ""}
-                          </strong>
-                          <small>
-                            اليوم {ar(e.day)} · <bdi>{e.id.slice(0, 4)}</bdi>
-                          </small>
-                        </span>
-                        <span className="activity-done">
-                          <Check size={16} />
-                          تمت القراءة
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="empty-state">
-                    <BookOpen size={32} />
-                    <h3>خطوة أولى نشاركها معًا</h3>
-                    <p>ستظهر هنا قراءات أعضاء مجموعتك عند تسجيلها اليوم.</p>
-                    <button
-                      className="text-button"
-                      onClick={() => {
-                        setView("read");
-                        menuDialog.current?.close();
-                      }}
-                    >
-                      اذهب إلى القراءة
-                      <ArrowLeft size={16} />
-                    </button>
-                  </div>
+                {!done && (
+                  <p className="local-explanation">
+                    سجّل إتمام القراءة أولًا لمشاركة يومك مع المجموعة.
+                  </p>
                 )}
               </section>
             )}
           </main>
         )}
       </div>
+      <input
+        ref={importInput}
+        type="file"
+        accept=".json,application/json"
+        hidden
+        onChange={restore}
+        aria-label="ملف النسخة الاحتياطية"
+      />
       <dialog
         aria-label="إدارة الرحلة"
         ref={dialog}
@@ -891,13 +849,51 @@ function App() {
           <span className="large-icon">
             {modal === "join" ? <BookOpen size={28} /> : <Link size={26} />}
           </span>
+          {error && (
+            <p role="alert" className="form-error">
+              {error}
+            </p>
+          )}
           {modal === "join" ? (
             <>
-              <h2>{invite ? "اقرأ مع مجموعتك" : "لنبدأ الرحلة"}</h2>
+              <h2>لنبدأ الرحلة</h2>
               <p>
-                اسمك وتاريخ البداية فقط. سنحفظ تقدمك على هذا الجهاز، دون كلمة
-                مرور.
+                اسمك وتاريخ البداية فقط. يُحفظ التقدم في هذا المتصفح. نزّل نسخة
+                احتياطية قبل مسح بياناته أو تغيير جهازك.
               </p>
+              {profiles.length > 0 && (
+                <label className="reader-picker">
+                  متابعة قارئ محفوظ
+                  <select
+                    defaultValue=""
+                    onChange={(e) => {
+                      try {
+                        applyReader(selectReader(localStorage, e.target.value));
+                        setModal("");
+                      } catch (err) {
+                        setError((err as Error).message);
+                      }
+                    }}
+                  >
+                    <option value="" disabled>
+                      اختر قارئًا
+                    </option>
+                    {profiles.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} · {ar(p.completed.length)} يومًا ·{" "}
+                        {p.startDate}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <button
+                className="setting-row"
+                onClick={() => importInput.current?.click()}
+              >
+                <Upload size={18} />
+                استعادة نسخة احتياطية
+              </button>
               <form onSubmit={join}>
                 <label>
                   اسمك
@@ -923,17 +919,8 @@ function App() {
                 <small>
                   لكل شخص جدوله الخاص. يمكنك تعويض أي يوم أو القراءة مسبقًا.
                 </small>
-                {error && (
-                  <p role="alert" className="form-error">
-                    {error}
-                  </p>
-                )}
                 <button className="primary full" disabled={busy}>
-                  {busy
-                    ? "جارٍ البدء…"
-                    : invite
-                      ? "انضم وابدأ القراءة"
-                      : "ابدأ القراءة"}
+                  {busy ? "جارٍ البدء…" : "ابدأ القراءة"}
                   <ArrowLeft size={18} />
                 </button>
               </form>
@@ -941,16 +928,10 @@ function App() {
           ) : modal === "settings" ? (
             <>
               <h2>رحلتك يا {member?.name}</h2>
-              <p>
-                بدأت في {dateLabel(start)}. تقدمك محفوظ، ويمكنك استعادته على
-                جهاز آخر.
-              </p>
-              <button
-                className="setting-row"
-                onClick={() => showLink("recover")}
-              >
-                <Link size={19} />
-                رابط استعادة رحلتي
+              <p>بدأت في {dateLabel(start)}. تقدمك محفوظ في هذا المتصفح فقط.</p>
+              <button className="setting-row" onClick={backup}>
+                <Download size={19} />
+                تنزيل نسخة احتياطية
                 <ChevronLeft size={17} />
               </button>
               <button
@@ -958,20 +939,32 @@ function App() {
                 onClick={() => showLink("invite")}
               >
                 <Users size={19} />
-                دعوة إلى مجموعتي
+                مشاركة رابط الموقع
+                <ChevronLeft size={17} />
+              </button>
+              <button
+                className="setting-row"
+                onClick={() => importInput.current?.click()}
+              >
+                <Upload size={18} />
+                استعادة نسخة احتياطية
                 <ChevronLeft size={17} />
               </button>
               <p className="muted">
-                احفظ رابط الاستعادة في مكان خاص قبل تغيير جهازك أو مسح بيانات
-                المتصفح.
+                النسخة الاحتياطية تحتوي اسمك وتاريخ البداية والأيام المكتملة وقت
+                تنزيلها. احتفظ بها لنفسك، ونزّل نسخة حديثة قبل تغيير الجهاز. لا
+                توجد مزامنة تلقائية.
               </p>
               <button
                 className="setting-row"
                 onClick={() => {
-                  saveStored("word-token", "");
-                  setToken("");
+                  try {
+                    selectReader(localStorage, null);
+                  } catch (e) {
+                    setError((e as Error).message);
+                    return;
+                  }
                   setMember(null);
-                  setActivity({ members: 0, entries: [] });
                   setSelected(1);
                   setView("read");
                   setModal("");
@@ -984,18 +977,18 @@ function App() {
           ) : (
             <>
               <h2>
-                {modal === "recover"
-                  ? "رابطك الخاص لاستعادة الرحلة"
-                  : "الرحلة أجمل معًا"}
+                {modal === "checkin"
+                  ? "مشاركة إتمام القراءة"
+                  : "مشاركة رابط الموقع"}
               </h2>
               <p>
-                {modal === "recover"
-                  ? "احتفظ بهذا الرابط لنفسك. من يملكه يستطيع الوصول إلى اسمك وتغيير تقدمك."
-                  : "شارك هذا الرابط مع أصدقائك. يختار كل شخص اسمه وتاريخ بدايته."}
+                {modal === "checkin"
+                  ? "انسخ النص وأرسله إلى مجموعتك، أو افتح واتساب لاختيار المستلمين."
+                  : "يبدأ كل قارئ رحلته الخاصة. هذا الرابط لا يشارك اسمك أو تقدمك."}
               </p>
               <input
                 className="link-field"
-                aria-label="الرابط"
+                aria-label="نص المشاركة"
                 dir="ltr"
                 readOnly
                 value={linkText}
@@ -1003,8 +996,18 @@ function App() {
               />
               <button className="primary full" onClick={copy}>
                 <Copy size={17} />
-                نسخ الرابط
+                نسخ
               </button>
+              {modal === "checkin" && (
+                <a
+                  className="quiet-button full whatsapp-link"
+                  href={"https://wa.me/?text=" + encodeURIComponent(linkText)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  فتح واتساب
+                </a>
+              )}
             </>
           )}
         </div>

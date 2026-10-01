@@ -1862,3 +1862,32 @@ dialog.navigation-drawer {
     display: none;
   }
 }
+.local-explanation {
+  font-size: 13px;
+  line-height: 2;
+  color: var(--muted);
+  margin: 18px 0;
+  max-width: 700px;
+}
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.reader-picker {
+  display: grid;
+  gap: 10px;
+  font-size: 12px;
+}
+.reader-picker select {
+  font: inherit;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  max-width: 100%;
+  padding: 10px;
+}
+.whatsapp-link {
+  margin-top: 12px;
+}

@@ -1,0 +1,97 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  createReader,
+  currentReader,
+  setCompletion,
+  selectReader,
+  exportBackup,
+  importBackup,
+  loadProgress,
+  validDate,
+  PROGRESS_KEY,
+} from "../src/progress.ts";
+function storage() {
+  const values = new Map();
+  return {
+    getItem: (k) => values.get(k) ?? null,
+    setItem: (k, v) => values.set(k, v),
+  };
+}
+test("Local progress survives reopening, is idempotent, supports reading ahead and undo", () => {
+  const s = storage();
+  const r = createReader(s, "ألبرت", "2026-10-01");
+  setCompletion(s, r.id, 1, true);
+  setCompletion(s, r.id, 1, true);
+  setCompletion(s, r.id, 150, true);
+  assert.deepEqual(currentReader(s).completed, [1, 150]);
+  assert.equal(currentReader(s).startDate, "2026-10-01");
+  setCompletion(s, r.id, 1, false);
+  assert.deepEqual(currentReader(s).completed, [150]);
+  assert.throws(() => setCompletion(s, r.id, 151, true));
+});
+test("Switching between duplicate names preserves separate progress", () => {
+  const s = storage();
+  const a = createReader(s, "قارئ", "2026-09-01");
+  setCompletion(s, a.id, 9, true);
+  const b = createReader(s, "قارئ", "2026-10-01");
+  assert.notEqual(a.id, b.id);
+  assert.deepEqual(b.completed, []);
+  selectReader(s, null);
+  assert.equal(currentReader(s), null);
+  selectReader(s, a.id);
+  assert.deepEqual(currentReader(s).completed, [9]);
+  assert.equal(loadProgress(s).profiles.length, 2);
+});
+test("Backup can move to another browser and never overwrites an existing profile", () => {
+  const first = storage();
+  let r = createReader(first, "ميخائيل", "2026-10-01");
+  r = setCompletion(first, r.id, 3, true);
+  const text = exportBackup(r);
+  const second = storage();
+  const existing = createReader(second, "قارئ آخر", "2026-09-01");
+  setCompletion(second, existing.id, 2, true);
+  const restored = importBackup(second, text);
+  assert.equal(restored.name, "ميخائيل");
+  assert.deepEqual(restored.completed, [3]);
+  assert.notEqual(restored.id, r.id);
+  selectReader(second, existing.id);
+  assert.deepEqual(currentReader(second).completed, [2]);
+});
+test("Bad dates, malformed backups, and corrupt stored data do not replace progress", () => {
+  const s = storage();
+  createReader(s, "Test", "2026-10-01");
+  const before = s.getItem(PROGRESS_KEY);
+  for (const text of [
+    "invalid",
+    "null",
+    JSON.stringify({ version: 2 }),
+    JSON.stringify({
+      version: 1,
+      reader: { name: "Test", startDate: "2026-02-31", completed: [1] },
+    }),
+    JSON.stringify({
+      version: 1,
+      reader: { name: "Test", startDate: "2026-10-01", completed: [151] },
+    }),
+  ])
+    assert.throws(() => importBackup(s, text));
+  assert.equal(s.getItem(PROGRESS_KEY), before);
+  assert.equal(validDate("2024-02-29"), true);
+  assert.equal(validDate("2026-02-29"), false);
+  s.setItem(PROGRESS_KEY, "corrupt");
+  assert.throws(() => createReader(s, "New", "2026-10-01"));
+  assert.equal(s.getItem(PROGRESS_KEY), "corrupt");
+});
+test("Blocked storage reports failed saving instead of pretending success", () => {
+  const s = storage();
+  const r = createReader(s, "Test", "2026-10-01");
+  const blocked = {
+    getItem: s.getItem,
+    setItem: () => {
+      throw Error("QuotaExceededError");
+    },
+  };
+  assert.throws(() => setCompletion(blocked, r.id, 1, true), /لم يتم الحفظ/);
+  assert.deepEqual(currentReader(s).completed, []);
+});
