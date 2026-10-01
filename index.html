@@ -6,13 +6,39 @@
     <meta name="theme-color" content="#f7f5ef" />
     <meta
       name="description"
-      content="رحلة قراءة العهد الجديد في ١٥٠ يومًا. اقرأ وتأمل وتابع تقدمك مع مجموعتك."
+      content="رحلة قراءة العهد الجديد بالترتيب الزمني في ١٥٠ يومًا. اقرأ وتأمل وتابع تقدمك يومًا بيوم."
     />
-    <link rel="icon" type="image/png" href="/church-logo.png" />
+    <script>
+      try {
+        if (localStorage.getItem("word-dark") === "true") {
+          document.documentElement.dataset.theme = "dark";
+          document.querySelector('meta[name="theme-color"]').content =
+            "#181e1a";
+        }
+      } catch {}
+    </script>
+    <link rel="icon" type="image/png" href="/src/assets/favicon.png" />
+    <link
+      rel="preload"
+      href="/src/assets/amiri.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/src/assets/noto-arabic.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <title>العهد الجديد بالترتيب الزمني</title>
   </head>
   <body>
     <div id="root"></div>
+    <noscript
+      >يحتاج قارئ العهد الجديد إلى تفعيل JavaScript في المتصفح.</noscript
+    >
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

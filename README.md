@@ -50,3 +50,23 @@ npm run build
 Validation: 150 days, 537 passages, 7,966 verse occurrences, and all 7,959 unique verses in this source New Testament. Seven repeated verses from the original plan are intentionally retained. All 27 books and 260 chapters are represented.
 
 Tests verify exact static passage fidelity, saved progress, duplicate names, catch-up, undo, switching readers, backup restoration, malformed data, date validation, and storage failures.
+
+## Design and performance verification
+
+The reader uses a responsive ivory/olive design, accessible light/dark themes, larger touch controls, and an 800px reading surface. Calendar and dialog components load on demand. Daily readings are cached for the browser session, concurrent requests are deduplicated, and failed requests offer a retry. Existing progress and backup formats are unchanged.
+
+Font assets now use WOFF2: approximately 396 KB instead of 1.14 MB (65% smaller). Conversion preserves glyphs, character mappings, and Arabic shaping tables. Original fonts are retained in `assets/source-fonts/`; licenses remain in `public/fonts/`. To regenerate assets, install Python packages `fonttools brotli pillow` and run `python scripts/optimize-assets.py`. Generated assets are committed, so deployment needs no Python tooling.
+
+```sh
+npm test
+npm run build
+npx playwright install --with-deps chromium
+npm run test:browser
+# With the production preview running (npm start):
+npm run test:visual
+npm run audit:performance
+```
+
+`CHROMIUM_PATH` optionally selects an existing Chromium executable. `BASELINE_URL` optionally adds a baseline site to screenshot and performance comparisons. Reports are saved under ignored `artifacts/`. Performance comparisons should use the same server and environment for both builds.
+
+Validated locally: production build, 11 unit/data tests, and 7 browser tests, including progress/backup flows, request races and retry, keyboard focus, and automated accessibility checks at 360, 390, 768, and 1440px in both themes. Lighthouse scores and deployed cache headers have not yet been verified. GitHub Actions runs the build and test suites on Node 22.
