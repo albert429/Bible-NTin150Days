@@ -108,7 +108,6 @@ test("subtle menu footer opens app credits and restores focus without changing r
       exact: true,
     });
     await expect(about).toContainText("شباب كنيسة الإخوة بخلوصي");
-    await expect(about).toContainText("Albert Alfred");
     await expect(about).toContainText("لا يدّعي هذا التطبيق أي حقوق نشر");
     await expect(
       about.getByRole("link", { name: "albertalfred429@gmail.com" }),

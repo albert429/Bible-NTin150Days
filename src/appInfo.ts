@@ -2,7 +2,6 @@
 export const APP_INFO = {
   title: "العهد الجديد بالترتيب الزمني",
   church: "كنيسة الإخوة بخلوصي",
-  developer: "Albert Alfred",
   email: "albertalfred429@gmail.com",
   githubName: "albert429",
   githubUrl: "https://github.com/albert429",

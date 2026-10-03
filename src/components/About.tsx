@@ -8,9 +8,6 @@ export default function About() {
         طُوّر هذا التطبيق لشباب {APP_INFO.church}، لقراءة العهد الجديد بالترتيب
         الزمني خلال ١٥٠ يومًا.
       </p>
-      <p>
-        تطوير <bdi dir="ltr">{APP_INFO.developer}</bdi>
-      </p>
       <p className="about-contact-label">للمزيد من المعلومات</p>
       <ul className="about-contacts">
         <li>
