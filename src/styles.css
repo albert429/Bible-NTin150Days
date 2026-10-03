@@ -1198,6 +1198,14 @@ input[type="date"] {
   }
 }
 @media (max-width: 299px) {
+  .menu-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+  .about-link {
+    align-self: flex-end;
+  }
   .topbar-inner {
     grid-template-columns: 44px minmax(0, 1fr) 44px;
   }
