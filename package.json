@@ -21,6 +21,7 @@
     "test": "node --experimental-strip-types --test tests/*.test.js",
     "test:browser": "playwright test",
     "test:visual": "node scripts/capture-preview.mjs",
+    "icons:build": "node scripts/export-favicon.mjs",
     "audit:performance": "node scripts/audit-performance.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

@@ -65,6 +65,8 @@ Expected coverage: **150 days, 537 passages, 7,966 verse occurrences, 7,959 uniq
 
 To regenerate committed font and logo assets, install Python packages `fonttools brotli pillow` and run `python3 scripts/optimize-assets.py`. Production deployment does not require Python. Original fonts and logo sources are preserved; license texts are bundled under `public/fonts/`.
 
+The Bible favicon is drawn in `src/assets/favicon.svg`. Edit that vector source and run `npm run icons:build` to export its 32px PNG fallback (requires the installed Playwright Chromium browser). The church logo regeneration script handles only the church artwork.
+
 ## Verification baseline
 
 The mobile redesign was checked at 320, 360, 390, and 430px, landscape, dark/light themes, 38px text, and narrow reflow. At 390×844 the first verse starts at approximately **162px**. Browser coverage uses Chromium and mobile WebKit emulation; it is not a claim of physical-device testing.

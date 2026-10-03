@@ -22,8 +22,8 @@ for source in (root / "assets/source-fonts").glob("*.ttf"):
         assert font.getTableData(table) == restored.getTableData(table)
     print(f"{source.name}: {source.stat().st_size} -> {target.stat().st_size} bytes")
 with Image.open(root / "public/church-logo.png") as original:
-    for size in (32, 96, 192):
-        target = output / ("favicon.png" if size == 32 else f"church-logo-{size}.png")
+    for size in (96, 192):
+        target = output / f"church-logo-{size}.png"
         artwork = original.convert("RGBA")
         artwork.thumbnail((size, size), Image.Resampling.LANCZOS)
         artwork.save(target, optimize=True)
