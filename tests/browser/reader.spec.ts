@@ -62,6 +62,71 @@ async function noOverflow(page: Page) {
     ),
   ).toBe(true);
 }
+test("subtle menu footer opens app credits and restores focus without changing reading", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await ready(page);
+  const initialDay = await page.getByRole("article").getAttribute("data-day");
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    if (width === 320) {
+      const settings = await appearance(page);
+      await settings.getByRole("button", { name: "الوضع الليلي" }).click();
+      await closeSheet(page);
+    }
+    const trigger = page.getByRole("button", {
+      name: "فتح القائمة",
+      exact: true,
+    });
+    await trigger.click();
+    const menuDialog = page.getByRole("dialog", {
+      name: "القائمة",
+      exact: true,
+    });
+    const aboutLink = menuDialog.getByRole("button", { name: "About the app" });
+    await expect(menuDialog.locator(".menu-source")).toContainText(
+      "النص: ترجمة فان دايك · ملكية عامة",
+    );
+    const sizes = await menuDialog.evaluate((element) => {
+      const source = element.querySelector(".menu-source")!;
+      const link = element.querySelector(".about-link")!;
+      return {
+        sourceFont: getComputedStyle(source).fontSize,
+        linkFont: getComputedStyle(link).fontSize,
+        sourceX: source.getBoundingClientRect().x,
+        linkRight: link.getBoundingClientRect().right,
+        targetHeight: link.getBoundingClientRect().height,
+      };
+    });
+    expect(sizes.linkFont).toBe(sizes.sourceFont);
+    expect(sizes.linkRight).toBeLessThan(sizes.sourceX);
+    expect(sizes.targetHeight).toBeGreaterThanOrEqual(44);
+    await aboutLink.click();
+    const about = page.getByRole("dialog", {
+      name: "About the app",
+      exact: true,
+    });
+    await expect(about).toContainText("شباب كنيسة الإخوة بخلوصي");
+    await expect(about).toContainText("Albert Alfred");
+    await expect(about).toContainText("لا يدّعي هذا التطبيق أي حقوق نشر");
+    await expect(
+      about.getByRole("link", { name: "albertalfred429@gmail.com" }),
+    ).toHaveAttribute("href", "mailto:albertalfred429@gmail.com");
+    await expect(
+      about.getByRole("link", { name: "albert429", exact: true }),
+    ).toHaveAttribute("href", "https://github.com/albert429");
+    await noOverflow(page);
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await page.keyboard.press("Escape");
+    await expect(about).not.toBeVisible();
+    await expect(trigger).toBeFocused();
+    await expect(page.getByRole("article")).toHaveAttribute(
+      "data-day",
+      initialDay!,
+    );
+  }
+});
 test("returning reader fetches only their day; revisits and calendar are cached", async ({
   page,
 }) => {

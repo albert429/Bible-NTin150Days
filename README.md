@@ -1,72 +1,64 @@
+![An open Bible and a phone reader — العهد الجديد بالترتيب الزمني](docs/assets/readme-banner.png)
+
 # العهد الجديد بالترتيب الزمني
 
-A frontend-only Arabic New Testament reading app with the supplied 150-day chronological plan. React + TypeScript + Vite. No backend, database, credentials, or environment variables are required.
+A calm Arabic New Testament reader built for the youth of the **Brethren Church at Kholousy**. Follow a 150-day chronological reading plan, with Scripture given almost the entire screen.
 
-## Run
+[Open the app](https://sfk-bible-reading.vercel.app/) · [Development guide](docs/development.md) · [Data sources](data/SOURCES.md)
 
-Node.js 22:
+[![Checks](https://github.com/albert429/Bible-NTin150Days/actions/workflows/checks.yml/badge.svg)](https://github.com/albert429/Bible-NTin150Days/actions/workflows/checks.yml)
+
+## Reading comes first
+
+- One slim, sticky toolbar; the rest of the page is for reading.
+- Clear Arabic text in Amiri, adjustable from 22–38px, with light and dark themes.
+- Original passage order, Scripture section headings, verse numbers, and quick passage jumps.
+- A personal start date, a 150-day calendar, completion with undo, and multiple readers on one device.
+- Local progress, JSON backup/restore, and optional sharing initiated by the reader.
+- Static frontend hosting, daily reading caches, and secondary screens loaded on demand.
+
+<p align="center">
+  <img src="docs/assets/mobile-reader.png" width="300" alt="Actual mobile app: a slim Arabic day toolbar followed immediately by Scripture" />
+</p>
+
+## Made for daily reading together
+
+![An illustration of church youth reading a Bible and a phone together](docs/assets/community-reading.png)
+
+Developed by **Albert Alfred** for the youth of the Brethren Church at Kholousy.
+
+Contact: [albertalfred429@gmail.com](mailto:albertalfred429@gmail.com) · GitHub: [albert429](https://github.com/albert429)
+
+The banner and community illustration are generated artwork. The mobile screenshot shows the actual app. [Artwork prompts and provenance](docs/design/image-prompts.md) are included in the repository.
+
+## Run locally
+
+Use **Node.js 22** and npm. No credentials or environment variables are required.
 
 ```sh
-npm install
+npm ci
 npm run dev
-npm test
-npm run build
-npm start
 ```
 
-`npm run dev` opens a development server on port 5173. `npm start` previews the production build on port 4173. The predev/prebuild scripts generate 150 daily JSON files and a small plan index in `public/readings/`; Vite includes them in `dist/`.
-
-## Deploy on Vercel
-
-Import the GitHub repository, choose the **Vite** preset, use **npm run build**, and set the output directory to **dist**. The checked-in `vercel.json` supplies these defaults. Pushes to the connected branch trigger redeployment. No `/api` routes, serverless functions, Neon account, database, or paid plan are needed for this version.
-
-Verify `/readings/plan.json` and `/readings/1.json` return JSON after deployment. If they do not, check that the deployment built the latest commit using the complete `npm run build` command (which runs `prebuild`), not `vite build` alone.
-
-## Reading and progress
-
-- Read all 150 days in their original passage order, with Arabic verse numbers, source headings, Amiri typography, 22–38px text, and light/dark modes.
-- The main workspace prioritizes Scripture. Navigation is in a drawer; the passage index expands on demand.
-- Each reader selects a personal start date. Calendar dates use Cairo time. Catch-up and advance readings never shift the schedule.
-- Progress is stored only in the current browser's localStorage under `nt-reading-progress-v1`. It survives refreshes and ordinary browser restarts. Clearing site data, private browsing cleanup, changing browsers, or changing the site's domain does not preserve that browser's progress.
-- Multiple readers can use the same browser. Switching readers preserves each profile, including duplicate names.
-- Settings allows downloading a JSON backup and restoring it on another browser. A backup is a snapshot, not a sync link. Imports create a separate profile and do not overwrite existing progress. Keep backups private because they contain the reader's name, start date, and completed days.
-- There is no live group activity or automatic device synchronization. Readers can copy a completion message or choose to open WhatsApp to share it themselves. Site links share only the public reading app.
-- Existing server-based device tokens/recovery links from the earlier implementation are not usable in this version. Local SQLite files are left untouched and remain excluded from Git. Previously saved server progress is not automatically migrated.
-- Bible files are static but still require a network connection when first fetched. This is not an offline/PWA implementation.
-
-## Source and import
-
-The user-supplied `New_Testament_150_Day_Arabic.docx` is the authority for passage order. Original table text is retained in `data/source-plan.json`. The importer normalizes its reversed RTL range notation.
-
-Bible source: [Arabic Van Dyck, eBible.org](https://ebible.org/bible/details.php?id=arb-vd), identified as public domain. Scripture wording and section headings are preserved; presentation markers are removed.
+Open `http://localhost:5173`. Development and production builds automatically generate the static reading files from `data/plan.json`.
 
 ```sh
-python3 scripts/extract-plan.py /path/to/New_Testament_150_Day_Arabic.docx
-curl -L --fail https://ebible.org/Scriptures/arb-vd_usfm.zip -o /tmp/arb-vd.zip
-python3 scripts/import.py /tmp/arb-vd.zip
-npm run build
+npm run validate                    # Formatting, unit/data tests, production build
+npx playwright install chromium webkit
+npm run test:browser                # Mobile Chromium + WebKit, including accessibility
+npm start                           # Preview the production build on port 4173
 ```
 
-Validation: 150 days, 537 passages, 7,966 verse occurrences, and all 7,959 unique verses in this source New Testament. Seven repeated verses from the original plan are intentionally retained. All 27 books and 260 chapters are represented.
+## Hosting and privacy
 
-Tests verify exact static passage fidelity, saved progress, duplicate names, catch-up, undo, switching readers, backup restoration, malformed data, date validation, and storage failures.
+React, TypeScript, and Vite build a static `dist/` directory. Vercel settings are checked into `vercel.json`; use the Vite preset and `npm run build`. The app requires no backend, database, or public API.
 
-## Design and performance verification
+Progress and appearance preferences stay in the current browser. There is no automatic account sync or live group tracking. Backups contain the reader's name, start date, and completed days; keep them private. Readings need a network connection on their first fetch; the app does not currently provide persistent offline access.
 
-The reader uses a responsive ivory/olive design, accessible light/dark themes, larger touch controls, and an 800px reading surface. Calendar and dialog components load on demand. Daily readings are cached for the browser session, concurrent requests are deduplicated, and failed requests offer a retry. Existing progress and backup formats are unchanged.
+See the [development guide](docs/development.md) for architecture, deployment troubleshooting, source regeneration, and performance checks. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before making changes.
 
-Font assets now use WOFF2: approximately 396 KB instead of 1.14 MB (65% smaller). Conversion preserves glyphs, character mappings, and Arabic shaping tables. Original fonts are retained in `assets/source-fonts/`; licenses remain in `public/fonts/`. To regenerate assets, install Python packages `fonttools brotli pillow` and run `python scripts/optimize-assets.py`. Generated assets are committed, so deployment needs no Python tooling.
+## Scripture attribution and rights
 
-```sh
-npm test
-npm run build
-npx playwright install --with-deps chromium
-npm run test:browser
-# With the production preview running (npm start):
-npm run test:visual
-npm run audit:performance
-```
+The bundled Scripture is the **Arabic Van Dyck / فان دايك, eBible.org `arb-vd` edition**. eBible.org identifies this edition as **public domain**. Translation is credited to the Syrian Mission, with the American Bible Society listed as a contributor. This project claims **no copyright over the Scripture text**. This statement applies to the identified source edition; it does not make a claim about every modern Bible edition or its editorial material. [Source and rights statement](https://ebible.org/bible/details.php?id=arb-vd).
 
-`CHROMIUM_PATH` optionally selects an existing Chromium executable. `BASELINE_URL` optionally adds a baseline site to screenshot and performance comparisons. Reports are saved under ignored `artifacts/`. Performance comparisons should use the same server and environment for both builds.
-
-Validated locally: production build, 11 unit/data tests, and 7 browser tests, including progress/backup flows, request races and retry, keyboard focus, and automated accessibility checks at 360, 390, 768, and 1440px in both themes. Lighthouse scores and deployed cache headers have not yet been verified. GitHub Actions runs the build and test suites on Node 22.
+Amiri and Noto Sans Arabic are distributed under the SIL Open Font License 1.1. Application code has no open-source license grant. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the separate terms covering code, Scripture, fonts, and artwork.

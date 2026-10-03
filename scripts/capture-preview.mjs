@@ -20,6 +20,7 @@ try {
         const page = await browser.newPage({
           viewport: { width, height: 1000 },
           deviceScaleFactor: 1,
+          reducedMotion: "reduce",
         });
         await page.addInitScript(
           (dark) => localStorage.setItem("word-dark", String(dark)),
@@ -48,8 +49,21 @@ try {
             .getByRole("button", { name: "فتح القائمة", exact: true })
             .click();
           await page.screenshot({
-            path: `${directory}/after-drawer-${theme}.png`,
+            path: `${directory}/after-menu-${theme}.png`,
           });
+          await page
+            .getByRole("button", { name: "About the app", exact: true })
+            .click();
+          await page.locator(".about-content").waitFor();
+          await page.screenshot({
+            path: `${directory}/after-about-${theme}.png`,
+          });
+          await page
+            .getByRole("button", { name: "إغلاق النافذة", exact: true })
+            .click();
+          await page
+            .getByRole("button", { name: "فتح القائمة", exact: true })
+            .click();
           await page
             .getByRole("dialog", { name: "القائمة", exact: true })
             .getByRole("button", { name: "رحلتي في ١٥٠ يومًا", exact: true })

@@ -10,12 +10,6 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:4173",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    launchOptions: {
-      executablePath: process.env.CHROMIUM_PATH || undefined,
-      args: process.env.CHROMIUM_PATH
-        ? ["--no-sandbox", "--disable-dev-shm-usage"]
-        : [],
-    },
   },
   projects: [
     {
@@ -23,6 +17,12 @@ export default defineConfig({
       use: {
         ...devices["Pixel 5"],
         viewport: { width: 390, height: 844 },
+        launchOptions: {
+          executablePath: process.env.CHROMIUM_PATH || undefined,
+          args: process.env.CHROMIUM_PATH
+            ? ["--no-sandbox", "--disable-dev-shm-usage"]
+            : [],
+        },
       },
     },
     {

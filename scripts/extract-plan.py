@@ -1,9 +1,45 @@
 """Extract the reading table, preserving original paragraph and passage order."""
-import json, sys, zipfile, xml.etree.ElementTree as ET
+
+import argparse
+import json
 from pathlib import Path
-source=Path(sys.argv[1]); ns={'w':'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
-with zipfile.ZipFile(source) as archive:
-    root=ET.fromstring(archive.read('word/document.xml'))
-rows=[[[ ''.join(t.text or '' for t in p.findall('.//w:t',ns)) for p in cell.findall('.//w:p',ns)] for cell in row.findall('w:tc',ns)] for row in root.findall('.//w:tr',ns)]
-(Path(__file__).resolve().parent.parent/'data/source-plan.json').write_text(json.dumps(rows,ensure_ascii=False,indent=2))
-print('Extracted',len(rows)-1,'daily entries')
+import xml.etree.ElementTree as ET
+import zipfile
+
+ROOT = Path(__file__).resolve().parent.parent
+NAMESPACES = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+
+
+def extract_rows(source: Path) -> list:
+    with zipfile.ZipFile(source) as archive:
+        document = ET.fromstring(archive.read("word/document.xml"))
+
+    rows = []
+    for row in document.findall(".//w:tr", NAMESPACES):
+        cells = []
+        for cell in row.findall("w:tc", NAMESPACES):
+            paragraphs = []
+            for paragraph in cell.findall(".//w:p", NAMESPACES):
+                text = "".join(
+                    run.text or ""
+                    for run in paragraph.findall(".//w:t", NAMESPACES)
+                )
+                paragraphs.append(text)
+            cells.append(paragraphs)
+        rows.append(cells)
+    return rows
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("source", type=Path, help="Original 150-day Word document")
+    args = parser.parse_args()
+    rows = extract_rows(args.source)
+    (ROOT / "data/source-plan.json").write_text(
+        json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(f"Extracted {len(rows) - 1} daily entries")
+
+
+if __name__ == "__main__":
+    main()

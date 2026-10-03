@@ -1,0 +1,10 @@
+/** Public app credits and the provenance of the bundled Scripture edition. */
+export const APP_INFO = {
+  title: "العهد الجديد بالترتيب الزمني",
+  church: "كنيسة الإخوة بخلوصي",
+  developer: "Albert Alfred",
+  email: "albertalfred429@gmail.com",
+  githubName: "albert429",
+  githubUrl: "https://github.com/albert429",
+  scriptureSource: "https://ebible.org/bible/details.php?id=arb-vd",
+} as const;

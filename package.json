@@ -1,7 +1,18 @@
 {
-  "name": "daily-word",
+  "name": "nt-bible-reading",
   "version": "1.0.0",
   "private": true,
+  "description": "A smartphone-first Arabic New Testament reader with a 150-day chronological plan.",
+  "author": "Albert Alfred <albertalfred429@gmail.com>",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/albert429/Bible-NTin150Days.git"
+  },
+  "homepage": "https://sfk-bible-reading.vercel.app/",
+  "bugs": {
+    "url": "https://github.com/albert429/Bible-NTin150Days/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -11,6 +22,9 @@
     "test:browser": "playwright test",
     "test:visual": "node scripts/capture-preview.mjs",
     "audit:performance": "node scripts/audit-performance.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "validate": "npm run format:check && npm test && npm run build",
     "predev": "node scripts/build-readings.js",
     "prebuild": "node scripts/build-readings.js"
   },
