@@ -8,6 +8,8 @@ const profile = {
   startDate: "2026-09-22",
   completed: [2, 4],
 };
+test.use({ reducedMotion: "reduce" });
+
 async function seed(page: Page, selected = true) {
   await page.clock.install({ time: new Date("2026-10-01T12:00:00Z") });
   await page.addInitScript(
@@ -35,6 +37,23 @@ async function menu(page: Page, target: string) {
 async function ready(page: Page) {
   await expect(page.locator(".scripture")).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
+}
+async function appearance(page: Page) {
+  await page
+    .getByRole("button", { name: "إعدادات القراءة", exact: true })
+    .click();
+  return page.getByRole("dialog", { name: "إعدادات القراءة", exact: true });
+}
+async function closeSheet(page: Page) {
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "إغلاق النافذة", exact: true })
+    .click();
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+}
+async function dayDetails(page: Page) {
+  await page.getByRole("button", { name: /^تفاصيل اليوم / }).click();
+  return page.getByRole("dialog", { name: /^قراءة اليوم / });
 }
 async function noOverflow(page: Page) {
   expect(
@@ -119,7 +138,7 @@ test("late responses cannot replace the selected day's Scripture", async ({
   const response = page.waitForResponse("**/readings/2.json");
   release();
   await response;
-  await expect(page.locator(".reading-end")).toContainText("٣");
+  await expect(page.getByRole("article")).toHaveAttribute("data-day", "3");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "اليوم ٣",
   );
@@ -236,37 +255,162 @@ test("dialogs support Escape and return focus; sharing preserves Arabic and URL 
     page.getByRole("textbox", { name: "نص المشاركة" }),
   ).toHaveAttribute("dir", "ltr");
 });
-test("light/dark layouts remain accessible at mobile, tablet, desktop and maximum type size", async ({
+test("the first verse begins within 200px and the toolbar stays a single accessible row", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await ready(page);
+  const verse = await page.locator(".verse").first().boundingBox();
+  expect(verse).not.toBeNull();
+  expect(verse!.y).toBeLessThanOrEqual(200);
+  await expect(page.locator(".verse-text").first()).toHaveCSS(
+    "font-size",
+    "28px",
+  );
+  await expect(page.locator(".verse-text").first()).toHaveCSS(
+    "line-height",
+    "56px",
+  );
+  for (const viewport of [
+    { width: 320, height: 720 },
+    { width: 360, height: 800 },
+    { width: 390, height: 844 },
+    { width: 430, height: 932 },
+    { width: 844, height: 390 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await noOverflow(page);
+    const header = await page.locator(".topbar").boundingBox();
+    expect(header!.height).toBe(60);
+    const buttons = await page
+      .locator(".topbar button")
+      .evaluateAll((elements) =>
+        elements.map((element) => {
+          const { x, y, width, height } = element.getBoundingClientRect();
+          return { x, y, width, height };
+        }),
+      );
+    expect(buttons).toHaveLength(5);
+    for (const button of buttons) {
+      expect(button.width).toBeGreaterThanOrEqual(44);
+      expect(button.height).toBeGreaterThanOrEqual(44);
+      expect(button.y).toBeGreaterThanOrEqual(header!.y);
+      expect(button.y + button.height).toBeLessThanOrEqual(
+        header!.y + header!.height,
+      );
+      expect(button.x).toBeGreaterThanOrEqual(0);
+      expect(button.x + button.width).toBeLessThanOrEqual(viewport.width);
+    }
+  }
+  await page.locator(".passage").last().scrollIntoViewIfNeeded();
+  expect((await page.locator(".topbar").boundingBox())!.y).toBe(0);
+});
+
+test("day details jump to passages below the sticky toolbar and offer Today only away from today", async ({
+  page,
+}) => {
+  await seed(page);
+  await page.goto("/");
+  await ready(page);
+  let details = await dayDetails(page);
+  await expect(
+    details.getByRole("button", { name: "قراءة اليوم", exact: true }),
+  ).toHaveCount(0);
+  await closeSheet(page);
+  await page.getByRole("button", { name: "اليوم السابق", exact: true }).click();
+  await ready(page);
+  details = await dayDetails(page);
+  const passageLink = details.locator('a[href^="#passage-"]').last();
+  const target = await passageLink.getAttribute("href");
+  await passageLink.click();
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  const heading = page.locator(`${target} h2`);
+  await expect(heading).toBeInViewport();
+  expect((await heading.boundingBox())!.y).toBeGreaterThanOrEqual(60);
+  details = await dayDetails(page);
+  await details
+    .getByRole("button", { name: "قراءة اليوم", exact: true })
+    .click();
+  await ready(page);
+  await expect(page.getByRole("article")).toHaveAttribute("data-day", "10");
+});
+
+test("reading sheets restore focus and preferences persist without changing the text", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await ready(page);
+  const scripture = await page.locator(".scripture").textContent();
+  for (const name of ["تفاصيل اليوم ١", "إعدادات القراءة"]) {
+    const trigger = page.getByRole("button", { name, exact: true });
+    await trigger.click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("dialog[open]")).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  }
+  const settings = await appearance(page);
+  await settings
+    .getByRole("button", { name: "الوضع الليلي", exact: true })
+    .click();
+  await expect(
+    settings.getByRole("button", { name: "الوضع الليلي", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  for (let i = 0; i < 5; i++)
+    await settings
+      .getByRole("button", { name: "تكبير الخط", exact: true })
+      .click();
+  await expect(
+    settings.getByRole("button", { name: "تكبير الخط", exact: true }),
+  ).toBeDisabled();
+  await closeSheet(page);
+  await page.reload();
+  await ready(page);
+  await expect(page.locator(".verse-text").first()).toHaveCSS(
+    "font-size",
+    "38px",
+  );
+  expect(await page.locator(".scripture").textContent()).toBe(scripture);
+  const restored = await appearance(page);
+  await expect(
+    restored.getByRole("button", { name: "الوضع الليلي", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await closeSheet(page);
+  for (const width of [320, 360, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    await noOverflow(page);
+  }
+});
+
+test("light and dark reading, day, appearance and menu sheets remain accessible", async ({
   page,
 }) => {
   await page.goto("/");
   await ready(page);
   for (const dark of [false, true]) {
-    if (dark)
-      await page
+    if (dark) {
+      const settings = await appearance(page);
+      await settings
         .getByRole("button", { name: "الوضع الليلي", exact: true })
         .click();
-    for (const width of [360, 390, 768, 1440]) {
-      await page.setViewportSize({ width, height: 900 });
+      await closeSheet(page);
+    }
+    for (const sheet of ["reading", "day", "appearance", "menu"]) {
+      if (sheet === "day") await dayDetails(page);
+      if (sheet === "appearance") await appearance(page);
+      if (sheet === "menu")
+        await page
+          .getByRole("button", { name: "فتح القائمة", exact: true })
+          .click();
       await noOverflow(page);
       const result = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
         .analyze();
       expect(result.violations).toEqual([]);
+      if (sheet !== "reading") await closeSheet(page);
     }
   }
-  await page.setViewportSize({ width: 360, height: 800 });
-  for (let i = 0; i < 5; i++)
-    await page.getByRole("button", { name: "تكبير الخط", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "تكبير الخط", exact: true }),
-  ).toBeDisabled();
-  await noOverflow(page);
-  await page.getByRole("button", { name: "وضع التركيز", exact: true }).click();
-  await noOverflow(page);
-  await page
-    .getByRole("button", { name: "إنهاء وضع التركيز", exact: true })
-    .click();
+  await page.setViewportSize({ width: 320, height: 720 });
   await menu(page, "رحلتي في ١٥٠ يومًا");
   await expect(page.locator(".calendar-day")).toHaveCount(30);
   await noOverflow(page);
@@ -274,4 +418,87 @@ test("light/dark layouts remain accessible at mobile, tablet, desktop and maximu
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
     .analyze();
   expect(result.violations).toEqual([]);
+});
+
+test("the longest reading and plan boundaries keep navigation and Scripture intact", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await ready(page);
+  await expect(
+    page.getByRole("button", { name: "اليوم السابق", exact: true }),
+  ).toBeDisabled();
+  await menu(page, "رحلتي في ١٥٠ يومًا");
+  await expect(page.locator(".calendar-day")).toHaveCount(30);
+  for (let i = 0; i < 4; i++)
+    await page
+      .getByRole("button", { name: "الأيام التالية", exact: true })
+      .click();
+  await page.locator(".calendar-day").nth(22).click();
+  await ready(page);
+  await expect(page.getByRole("article")).toHaveAttribute("data-day", "143");
+  await expect(page.locator(".verse")).toHaveCount(60);
+  await expect(page.locator(".passage h2 bdi").first()).toBeVisible();
+  await menu(page, "رحلتي في ١٥٠ يومًا");
+  await page.locator(".calendar-day").last().click();
+  await ready(page);
+  await expect(page.getByRole("article")).toHaveAttribute("data-day", "150");
+  await expect(
+    page.getByRole("button", { name: "اليوم التالي", exact: true }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "اليوم السابق", exact: true }).click();
+  await ready(page);
+  await expect(page.getByRole("article")).toHaveAttribute("data-day", "149");
+});
+
+test("200% phone reflow keeps day navigation accessible without horizontal scrolling", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 195, height: 422 });
+  await page.goto("/");
+  await ready(page);
+  await noOverflow(page);
+  const details = await dayDetails(page);
+  await expect(
+    details.getByRole("button", { name: "اليوم السابق" }),
+  ).toBeDisabled();
+  await details.getByRole("button", { name: "اليوم التالي" }).click();
+  await ready(page);
+  await expect(page.getByRole("article")).toHaveAttribute("data-day", "2");
+  await noOverflow(page);
+});
+
+test("reduced motion suppresses sheet animation and standard motion uses a brief transition", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await ready(page);
+  const settings = await appearance(page);
+  const duration = await settings
+    .locator(".sheet-surface")
+    .evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        animation: style.animationDuration,
+        transition: style.transitionDuration,
+      };
+    });
+  for (const value of [duration.animation, duration.transition])
+    for (const seconds of value.split(","))
+      expect(parseFloat(seconds)).toBeLessThanOrEqual(0.001);
+  await closeSheet(page);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const animated = await appearance(page);
+  const timings = await animated
+    .locator(".sheet-surface")
+    .evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [
+        ...style.animationDuration.split(","),
+        ...style.transitionDuration.split(","),
+      ].map(parseFloat);
+    });
+  expect(Math.max(...timings)).toBeGreaterThan(0);
+  expect(Math.max(...timings)).toBeLessThanOrEqual(0.2);
+  await closeSheet(page);
 });

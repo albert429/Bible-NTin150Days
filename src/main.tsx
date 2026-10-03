@@ -17,6 +17,8 @@ import Reader from "./components/Reader";
 import Navigation, { type View } from "./components/Navigation";
 import { ChunkBoundary, Loading } from "./components/Feedback";
 import type { Modal } from "./components/Dialogs";
+import { useReading } from "./useReading";
+import type { Day } from "./readings";
 const Calendar = lazy(() => import("./components/Calendar"));
 const Dialogs = lazy(() => import("./components/Dialogs"));
 
@@ -68,7 +70,6 @@ function App() {
   const [dark, setDark] = useState(
     () => readStored("word-dark", "false") === "true",
   );
-  const [focus, setFocus] = useState(false);
   const [error, setError] = useState(initial.error);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -81,6 +82,7 @@ function App() {
   const start = member?.startDate || currentDate;
   const current = dayIndex(start, currentDate);
   const done = member?.completed.includes(selected) || false;
+  const reading = useReading<Day>(String(selected));
 
   function applyReader(reader: Profile | null) {
     const nextProfiles = loadProgress(localStorage).profiles;
@@ -92,7 +94,6 @@ function App() {
   }
   function navigate(next: View) {
     setView(next);
-    if (next !== "read") setFocus(false);
     requestAnimationFrame(() => main.current?.focus({ preventScroll: true }));
     window.scrollTo({ top: 0 });
   }
@@ -268,17 +269,33 @@ function App() {
     return () => clearTimeout(timer);
   }, [notice]);
   return (
-    <div className={`app ${focus ? "focused" : ""}`}>
+    <div className="app">
       <Navigation
         view={view}
         navigate={navigate}
         member={member}
         settings={() => openModal(member ? "settings" : "join")}
+        backup={backup}
+        restore={() => importInput.current?.click()}
         dark={dark}
         setDark={setDark}
-        goToday={() => go(scheduledDay(start, currentDate))}
+        font={font}
+        setFont={setFont}
+        selected={selected}
+        current={current}
+        date={dateFor(start, selected)}
+        done={done}
+        reading={reading.data}
+        readingError={reading.error}
+        retryReading={reading.retry}
+        go={go}
       />
-      <main id="main" ref={main} tabIndex={-1}>
+      <main
+        id="main"
+        ref={main}
+        tabIndex={-1}
+        className={view === "read" ? "reading-main" : undefined}
+      >
         {error && !modal && (
           <div className="error" role="alert">
             <span>{error}</span>
@@ -294,15 +311,12 @@ function App() {
         {view === "read" ? (
           <Reader
             selected={selected}
-            current={current}
-            date={dateFor(start, selected)}
+            reading={reading.data}
+            error={reading.error}
+            retry={reading.retry}
             done={done}
             busy={busy}
             font={font}
-            setFont={setFont}
-            focus={focus}
-            setFocus={setFocus}
-            go={go}
             complete={complete}
           />
         ) : (
