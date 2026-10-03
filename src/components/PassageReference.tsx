@@ -12,7 +12,7 @@ export default function PassageReference({ passage }: { passage: Passage }) {
       dir="ltr"
       aria-label={`الإصحاح ${ar(passage.chapter)}، ${passage.start === passage.end ? "الآية" : "الآيات"} ${range}`}
     >
-      {ar(passage.chapter)}:{range}
+      {ar(passage.chapter)}: {range}
     </bdi>
   );
 }
