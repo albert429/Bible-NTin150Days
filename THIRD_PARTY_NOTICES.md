@@ -23,8 +23,10 @@ The church logo and the 150-day plan were supplied for this app. Their inclusion
 
 The README banner and community illustration were created with the built-in image generation tool for this repository. They illustrate the purpose of the app; they are not Scripture sources, screenshots, or depictions of identifiable church members. The screenshot in the README was captured from the running app. [Prompts and provenance](docs/design/image-prompts.md).
 
+The banner includes an eBible.org attribution and logo based on the [official logo asset](https://ebible.org/icon/eBibleorglogo.svg). The eBible.org identity belongs to its owner; the Scripture edition's public-domain status does not extend to the logo.
+
 ## Software dependencies
 
 React and React DOM use the MIT License; Lucide uses the ISC License. Each installed dependency retains its own license in the npm package. The lockfile records exact dependency versions. The application copyright notice does not override these licenses.
 
-The small React mark in the menu and README is adapted from the [official React website's Logo component](https://github.com/reactjs/react.dev/blob/main/src/components/Logo.tsx), credited to Meta Platforms, Inc. and affiliates under MIT. It uses a restrained monochrome color for the footer. The [MIT notice is bundled](public/licenses/react-logo-MIT.txt).
+The small React mark in About the app and the README is adapted from the [official React website's Logo component](https://github.com/reactjs/react.dev/blob/main/src/components/Logo.tsx), credited to Meta Platforms, Inc. and affiliates under MIT. It uses a restrained monochrome color. The [MIT notice is bundled](public/licenses/react-logo-MIT.txt).

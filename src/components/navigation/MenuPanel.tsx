@@ -12,7 +12,6 @@ import type { Reader } from "../../progress";
 import type { View } from "../Navigation";
 import { ar } from "../../format";
 import { APP_INFO } from "../../appInfo";
-import ReactIcon from "../ReactIcon";
 import logoLarge from "../../assets/church-logo-192.png";
 
 const links = [
@@ -114,10 +113,6 @@ export default function MenuPanel({
       <footer className="menu-footer">
         <div className="menu-source">
           <p>النص: ترجمة فان دايك · ملكية عامة</p>
-          <p className="react-credit" lang="en" dir="ltr">
-            <ReactIcon />
-            <span>Built using React</span>
-          </p>
           <p>
             بيانات النص من{" "}
             <a href={APP_INFO.scriptureSource} target="_blank" rel="noreferrer">

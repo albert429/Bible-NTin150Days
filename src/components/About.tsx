@@ -1,4 +1,5 @@
 import { APP_INFO } from "../appInfo";
+import ReactIcon from "./ReactIcon";
 
 export default function About() {
   return (
@@ -37,6 +38,10 @@ export default function About() {
         </a>
         ، والمصنّفة هناك ضمن الملكية العامة. لا يدّعي هذا التطبيق أي حقوق نشر
         على النص الكتابي.
+      </p>
+      <p className="react-credit" lang="en" dir="ltr">
+        <ReactIcon />
+        <span>Built using React</span>
       </p>
     </section>
   );
