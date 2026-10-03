@@ -12,6 +12,7 @@ import type { Reader } from "../../progress";
 import type { View } from "../Navigation";
 import { ar } from "../../format";
 import { APP_INFO } from "../../appInfo";
+import ReactIcon from "../ReactIcon";
 import logoLarge from "../../assets/church-logo-192.png";
 
 const links = [
@@ -111,13 +112,19 @@ export default function MenuPanel({
         </button>
       </div>
       <footer className="menu-footer">
-        <p className="menu-source">
-          النص: ترجمة فان دايك · ملكية عامة
-          <br />
-          <a href={APP_INFO.scriptureSource} target="_blank" rel="noreferrer">
-            eBible.org
-          </a>
-        </p>
+        <div className="menu-source">
+          <p>النص: ترجمة فان دايك · ملكية عامة</p>
+          <p className="react-credit" lang="en" dir="ltr">
+            <ReactIcon />
+            <span>Built using React</span>
+          </p>
+          <p>
+            بيانات النص من{" "}
+            <a href={APP_INFO.scriptureSource} target="_blank" rel="noreferrer">
+              eBible.org
+            </a>
+          </p>
+        </div>
         <button className="about-link" lang="en" dir="ltr" onClick={about}>
           <Info size={13} aria-hidden="true" />
           <span>About the app</span>

@@ -1,6 +1,6 @@
 ![An open Bible and a phone reader — العهد الجديد بالترتيب الزمني](docs/assets/readme-banner.png)
 
-# العهد الجديد بالترتيب الزمني
+# The New Testament in Chronological Order<br /><span lang="ar" dir="rtl">العهد الجديد بالترتيب الزمني</span>
 
 A calm Arabic New Testament reader built for the youth of the **Brethren Church at Kholousy**. Follow a 150-day chronological reading plan, with Scripture given almost the entire screen.
 
@@ -62,3 +62,10 @@ See the [development guide](docs/development.md) for architecture, deployment tr
 The bundled Scripture is the **Arabic Van Dyck / فان دايك, eBible.org `arb-vd` edition**. eBible.org identifies this edition as **public domain**. Translation is credited to the Syrian Mission, with the American Bible Society listed as a contributor. This project claims **no copyright over the Scripture text**. This statement applies to the identified source edition; it does not make a claim about every modern Bible edition or its editorial material. [Source and rights statement](https://ebible.org/bible/details.php?id=arb-vd).
 
 Amiri and Noto Sans Arabic are distributed under the SIL Open Font License 1.1. Application code has no open-source license grant. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the separate terms covering code, Scripture, fonts, and artwork.
+
+---
+
+<p>
+  <sub><img src="docs/assets/react-mark.svg" width="14" height="14" alt="" /> Built using <a href="https://react.dev/">React</a><br />
+  Scripture data courtesy of <a href="https://ebible.org/bible/details.php?id=arb-vd">eBible.org</a> — Arabic Van Dyck, public domain.</sub>
+</p>

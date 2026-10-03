@@ -26,3 +26,5 @@ The README banner and community illustration were created with the built-in imag
 ## Software dependencies
 
 React and React DOM use the MIT License; Lucide uses the ISC License. Each installed dependency retains its own license in the npm package. The lockfile records exact dependency versions. The application copyright notice does not override these licenses.
+
+The small React mark in the menu and README is adapted from the [official React website's Logo component](https://github.com/reactjs/react.dev/blob/main/src/components/Logo.tsx), credited to Meta Platforms, Inc. and affiliates under MIT. It uses a restrained monochrome color for the footer. The [MIT notice is bundled](public/licenses/react-logo-MIT.txt).

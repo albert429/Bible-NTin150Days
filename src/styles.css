@@ -830,6 +830,18 @@ input[type="date"] {
   font-size: 12px;
   line-height: 2;
 }
+.menu-source p {
+  margin: 0;
+}
+.react-credit {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+.react-credit svg {
+  flex-shrink: 0;
+}
 .menu-source a,
 .about-content a {
   color: var(--olive);
