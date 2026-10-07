@@ -16,6 +16,7 @@ import Navigation, { type View } from "./components/Navigation";
 import { ChunkBoundary, Loading } from "./components/Feedback";
 import type { Modal } from "./components/Dialogs";
 import { useReading } from "./useReading";
+import { useAdjacentPrefetch } from "./useAdjacentPrefetch";
 import type { Day } from "./readings";
 import { useAppearance } from "./useAppearance";
 const Share = lazy(() => import("./components/Share"));
@@ -64,6 +65,7 @@ export default function App() {
   const current = dayIndex(start, currentDate);
   const done = member?.completed.includes(selected) || false;
   const reading = useReading<Day>(String(selected));
+  useAdjacentPrefetch(selected, reading.data, reading.error, view === "read");
 
   function applyReader(reader: Profile | null) {
     const nextProfiles = loadProgress(localStorage).profiles;

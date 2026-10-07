@@ -1,0 +1,54 @@
+import { useEffect } from "react";
+import { readings, type Day } from "./readings";
+
+type Connection = { saveData?: boolean; effectiveType?: string };
+
+export function allowsReadingPrefetch(connection?: Connection) {
+  return (
+    !connection?.saveData &&
+    !["slow-2g", "2g", "3g"].includes(connection?.effectiveType || "")
+  );
+}
+
+function connectionAllowsPrefetch() {
+  return allowsReadingPrefetch(
+    (navigator as Navigator & { connection?: Connection }).connection,
+  );
+}
+
+export function useAdjacentPrefetch(
+  selected: number,
+  reading: Day | undefined,
+  error: string | undefined,
+  active: boolean,
+) {
+  useEffect(() => {
+    if (
+      !active ||
+      reading?.day !== selected ||
+      error ||
+      !connectionAllowsPrefetch()
+    )
+      return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Let the selected reading and its fonts settle before scheduling neighbors.
+    Promise.resolve(document.fonts?.ready).then(
+      () => {
+        if (cancelled) return;
+        timer = setTimeout(() => {
+          if (cancelled || !connectionAllowsPrefetch()) return;
+          void readings.prefetchDay(selected - 1);
+          void readings.prefetchDay(selected + 1);
+        }, 500);
+      },
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      // Requests already started belong to the shared client and may be foreground work.
+    };
+  }, [selected, reading?.day, error, active]);
+}

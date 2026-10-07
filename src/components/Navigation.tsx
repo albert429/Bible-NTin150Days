@@ -64,6 +64,7 @@ export default function Navigation({
     setOpen(true);
   }
   function close(action?: () => void) {
+    if (!open) return;
     afterClose.current = action || null;
     setOpen(false);
   }

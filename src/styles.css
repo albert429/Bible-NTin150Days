@@ -97,9 +97,9 @@ a {
 }
 button {
   transition:
-    background 0.16s ease,
-    color 0.16s ease,
-    border-color 0.16s ease;
+    background 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease;
 }
 button:disabled {
   opacity: 0.45;
@@ -395,7 +395,7 @@ main.reading-main {
   gap: 8px;
   color: var(--olive);
   font-weight: 600;
-  animation: completion-enter 180ms ease-out;
+  animation: completion-enter 120ms ease-out;
 }
 @keyframes completion-enter {
   from {
@@ -411,10 +411,10 @@ main.reading-main {
 .reader-sheet button,
 .reading-completion button {
   transition:
-    background 160ms ease,
-    color 160ms ease,
-    border-color 160ms ease,
-    transform 120ms ease;
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease,
+    transform 80ms ease;
 }
 .topbar button:active:not(:disabled),
 .reader-sheet button:active:not(:disabled),
@@ -746,21 +746,21 @@ input[type="date"] {
   padding: 4px 20px calc(24px + env(safe-area-inset-bottom, 0px));
 }
 .reader-sheet[open] .sheet-surface {
-  animation: sheet-enter 200ms ease-out both;
+  animation: sheet-enter 150ms ease-out both;
 }
 .reader-sheet[open]::backdrop {
-  animation: backdrop-enter 200ms ease-out both;
+  animation: backdrop-enter 150ms ease-out both;
 }
 .reader-sheet[data-closing="true"] .sheet-surface {
-  animation: sheet-exit 200ms ease-in both;
+  animation: sheet-exit 100ms ease-in both;
 }
 .reader-sheet[data-closing="true"]::backdrop {
-  animation: backdrop-exit 200ms ease-in both;
+  animation: backdrop-exit 100ms ease-in both;
 }
 @keyframes sheet-enter {
   from {
     opacity: 0;
-    transform: translateY(32px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -774,7 +774,7 @@ input[type="date"] {
   }
   to {
     opacity: 0;
-    transform: translateY(32px);
+    transform: translateY(12px);
   }
 }
 @keyframes backdrop-enter {

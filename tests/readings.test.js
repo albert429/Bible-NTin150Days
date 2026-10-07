@@ -70,6 +70,38 @@ test("Calendar failures are separate from cached readings", async () => {
   await assert.rejects(client.load("plan"), /تعذر تحميل خطة القراءة/);
   assert.deepEqual(client.peek("1"), day(1));
 });
+test("Speculative reads share foreground requests, respect bounds, and retry failures", async () => {
+  let requests = 0;
+  let resolve;
+  const client = createReadingsClient(() => {
+    requests++;
+    return new Promise((done) => {
+      resolve = done;
+    });
+  });
+  await Promise.all([0, 151, NaN, 1.5].map(client.prefetchDay));
+  assert.equal(requests, 0);
+  const warm = client.prefetchDay(2);
+  const foreground = client.load("2");
+  await Promise.resolve();
+  assert.equal(requests, 1);
+  resolve(Response.json(day(2)));
+  await warm;
+  assert.deepEqual(await foreground, day(2));
+  await client.prefetchDay(2);
+  assert.equal(requests, 1);
+
+  let attempts = 0;
+  const retryable = createReadingsClient(async () =>
+    ++attempts === 1
+      ? new Response("failed", { status: 503 })
+      : Response.json(day(3)),
+  );
+  await retryable.prefetchDay(3);
+  assert.equal(retryable.peek("3"), undefined);
+  assert.deepEqual(await retryable.load("3"), day(3));
+  assert.equal(attempts, 2);
+});
 test("Cairo calendar dates preserve catch-up schedule and day boundaries", () => {
   assert.equal(dayIndex("2026-09-22", "2026-10-01"), 10);
   assert.equal(scheduledDay("2026-10-02", "2026-10-01"), 1);

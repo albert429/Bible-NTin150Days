@@ -126,7 +126,7 @@ test("subtle menu footer opens app credits and restores focus without changing r
     );
   }
 });
-test("returning reader fetches only their day; revisits and calendar are cached", async ({
+test("returning reader fetches their day first; revisits and calendar are cached", async ({
   page,
 }) => {
   await seed(page);
@@ -140,7 +140,10 @@ test("returning reader fetches only their day; revisits and calendar are cached"
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "اليوم ١٠",
   );
-  expect(requests).toEqual(["/readings/10.json"]);
+  expect(requests[0]).toBe("/readings/10.json");
+  expect(
+    requests.every((url) => /^\/readings\/(9|10|11)\.json$/.test(url)),
+  ).toBe(true);
   await page.getByRole("button", { name: "اليوم التالي", exact: true }).click();
   await ready(page);
   await page.getByRole("button", { name: "اليوم السابق", exact: true }).click();
@@ -565,4 +568,182 @@ test("reduced motion suppresses sheet animation and standard motion uses a brief
   expect(Math.max(...timings)).toBeGreaterThan(0);
   expect(Math.max(...timings)).toBeLessThanOrEqual(0.2);
   await closeSheet(page);
+});
+
+test("fonts gate adjacent prefetch and a warmed reading opens without a loading flash", async ({
+  page,
+}) => {
+  const requests: string[] = [];
+  page.on("request", (request) =>
+    requests.push(new URL(request.url()).pathname),
+  );
+  let releaseFonts!: () => void;
+  const fonts = new Promise<void>((resolve) => {
+    releaseFonts = resolve;
+  });
+  await page.route("**/*.woff2", async (route) => {
+    await fonts;
+    await route.continue();
+  });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".scripture")).toBeVisible();
+  await page.waitForTimeout(650);
+  expect(requests.filter((url) => url.includes("/readings/"))).toEqual([
+    "/readings/1.json",
+  ]);
+  expect(requests.some((url) => url.includes("church-logo-192"))).toBe(false);
+  const prefetched = page.waitForResponse("**/readings/2.json");
+  releaseFonts();
+  await ready(page);
+  await (await prefetched).finished();
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+  );
+  const loadingFlash = await page.evaluate(
+    () =>
+      new Promise<boolean>((resolve) => {
+        const article = document.querySelector("article")!;
+        let loading = false;
+        const observer = new MutationObserver(() => {
+          loading ||= !!article.querySelector(".loading-state");
+          if (
+            article.getAttribute("data-day") === "2" &&
+            article.querySelector(".scripture")
+          ) {
+            observer.disconnect();
+            resolve(loading);
+          }
+        });
+        observer.observe(article, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+        });
+        document.querySelector<HTMLButtonElement>(".next-day")!.click();
+      }),
+  );
+  expect(loadingFlash).toBe(false);
+  expect(requests.filter((url) => url === "/readings/2.json")).toHaveLength(1);
+  await expect(page.locator(".reader h2").first()).toContainText("لوقا");
+});
+
+test("speculative failures stay silent and foreground navigation retries", async ({
+  page,
+}) => {
+  let attempts = 0;
+  await page.route("**/readings/2.json", (route) =>
+    ++attempts === 1
+      ? route.fulfill({ status: 503, body: "failed" })
+      : route.continue(),
+  );
+  const failed = page.waitForResponse("**/readings/2.json");
+  await page.goto("/");
+  await ready(page);
+  await (await failed).finished();
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+  );
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.getByRole("button", { name: "اليوم التالي", exact: true }).click();
+  await ready(page);
+  await expect(page.getByRole("article")).toHaveAttribute("data-day", "2");
+  expect(attempts).toBe(2);
+});
+
+test("data saving and slow connections suppress speculative reads", async ({
+  page,
+}) => {
+  for (const connection of [
+    { saveData: true, effectiveType: "4g" },
+    { effectiveType: "2g" },
+    { effectiveType: "3g" },
+  ]) {
+    await page.addInitScript(
+      (connection) =>
+        Object.defineProperty(navigator, "connection", {
+          configurable: true,
+          value: connection,
+        }),
+      connection,
+    );
+    const requests: string[] = [];
+    const record = (request: import("@playwright/test").Request) => {
+      if (request.url().includes("/readings/"))
+        requests.push(new URL(request.url()).pathname);
+    };
+    page.on("request", record);
+    await page.goto("/");
+    await ready(page);
+    await page.waitForTimeout(700);
+    expect(requests).toEqual(["/readings/1.json"]);
+    await page
+      .getByRole("button", { name: "اليوم التالي", exact: true })
+      .click();
+    await ready(page);
+    await expect(page.getByRole("article")).toHaveAttribute("data-day", "2");
+    page.off("request", record);
+  }
+});
+
+test("leaving reading cancels queued prefetch", async ({ page }) => {
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/readings/"))
+      requests.push(new URL(request.url()).pathname);
+  });
+  let releaseFonts!: () => void;
+  const fonts = new Promise<void>((resolve) => {
+    releaseFonts = resolve;
+  });
+  await page.route("**/*.woff2", async (route) => {
+    await fonts;
+    await route.continue();
+  });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".scripture")).toBeVisible();
+  await menu(page, "رحلتي في ١٥٠ يومًا");
+  await expect(page.locator(".calendar-day")).toHaveCount(30);
+  releaseFonts();
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(700);
+  expect(requests).toEqual(["/readings/1.json", "/readings/plan.json"]);
+});
+
+test("sheet content survives exit, releases after closing, and rapid reopen stays usable", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  await ready(page);
+  await expect(page.locator(".menu-brand")).toHaveCount(0);
+  const trigger = page.getByRole("button", {
+    name: "فتح القائمة",
+    exact: true,
+  });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "القائمة", exact: true });
+  await expect(dialog.locator(".menu-brand")).toBeVisible();
+  await dialog.evaluate((element) =>
+    element.querySelector<HTMLButtonElement>(".sheet-header button")!.click(),
+  );
+  await expect(dialog).toHaveAttribute("data-closing", "true");
+  await expect(page.locator(".menu-brand")).toHaveCount(1);
+  await page.evaluate(() =>
+    document.querySelector<HTMLButtonElement>(".menu-toggle")!.click(),
+  );
+  await expect(dialog).not.toHaveAttribute("data-closing", "true");
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
+  await expect(page.locator(".menu-brand")).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await dialog.evaluate((element) => (element as HTMLDialogElement).close());
+  await expect(page.locator(".menu-brand")).toHaveCount(0);
+  await trigger.click();
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
 });

@@ -1,4 +1,10 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { X } from "lucide-react";
 
 type Props = {
@@ -10,7 +16,7 @@ type Props = {
   children: ReactNode;
 };
 
-/** Keep this mounted, including its content, until the closing transition ends. */
+/** Keep the native dialog mounted; retain its content only through its exit. */
 export default function Sheet({
   open,
   title,
@@ -20,6 +26,8 @@ export default function Sheet({
   children,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const surface = useRef<HTMLDivElement>(null);
+  const closeRequested = useRef(false);
   const trigger = useRef<HTMLElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const active = useRef(false);
@@ -28,6 +36,7 @@ export default function Sheet({
   latest.current = { open, onClose, onAfterClose };
   const titleId = useId();
   const [closing, setClosing] = useState(false);
+  const [retained, setRetained] = useState(false);
 
   function cancelTimer() {
     if (timer.current !== null) {
@@ -41,6 +50,7 @@ export default function Sheet({
     if (!active.current) return;
     active.current = false;
     setClosing(false);
+    setRetained(false);
     if (dialog.current?.open) {
       // Native close events are asynchronous; consume ours even if reopened.
       expectedCloseEvents.current += 1;
@@ -53,12 +63,14 @@ export default function Sheet({
     latest.current.onAfterClose?.();
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     cancelTimer();
     const element = dialog.current;
     if (!element) return;
 
     if (open) {
+      closeRequested.current = false;
+      setRetained(true);
       setClosing(false);
       if (!active.current) {
         trigger.current =
@@ -74,17 +86,53 @@ export default function Sheet({
         finishClose();
       } else {
         setClosing(true);
-        timer.current = setTimeout(() => {
-          if (!latest.current.open) finishClose();
-        }, 200);
       }
     }
 
     return cancelTimer;
   }, [open]);
 
+  useLayoutEffect(() => {
+    cancelTimer();
+    if (!closing || open || !surface.current) return;
+
+    // Read the committed exit animation, so the fallback follows the CSS.
+    const style = getComputedStyle(surface.current);
+    const names = style.animationName.split(",").map((name) => name.trim());
+    const durations = style.animationDuration.split(",");
+    const delays = style.animationDelay.split(",");
+    const milliseconds = (value: string) =>
+      parseFloat(value) * (value.trim().endsWith("ms") ? 1 : 1000);
+    const index = names.indexOf("sheet-exit");
+    const duration =
+      index < 0
+        ? 0
+        : milliseconds(durations[index % durations.length]) +
+          milliseconds(delays[index % delays.length]);
+    const finishExit = () => {
+      if (!latest.current.open) finishClose();
+    };
+    if (duration <= 0) {
+      finishExit();
+      return;
+    }
+    timer.current = setTimeout(finishExit, duration);
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const handleMotionChange = () => {
+      if (reducedMotion.matches) finishExit();
+    };
+    reducedMotion.addEventListener("change", handleMotionChange);
+    return () => {
+      cancelTimer();
+      reducedMotion.removeEventListener("change", handleMotionChange);
+    };
+  }, [closing, open]);
+
   function requestClose() {
-    if (latest.current.open) latest.current.onClose();
+    if (latest.current.open && !closeRequested.current) {
+      closeRequested.current = true;
+      latest.current.onClose();
+    }
   }
 
   return (
@@ -112,20 +160,37 @@ export default function Sheet({
         if (event.target === event.currentTarget) requestClose();
       }}
     >
-      <div className="sheet-surface">
-        <div className="sheet-header">
-          <h2 id={titleId}>{title}</h2>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="إغلاق النافذة"
-            onClick={requestClose}
-            autoFocus
-          >
-            <X size={22} aria-hidden="true" />
-          </button>
-        </div>
-        <div className="sheet-body">{children}</div>
+      <div
+        ref={surface}
+        className="sheet-surface"
+        onAnimationEnd={(event) => {
+          if (
+            event.target === event.currentTarget &&
+            event.animationName === "sheet-exit" &&
+            closing &&
+            !latest.current.open
+          ) {
+            finishClose();
+          }
+        }}
+      >
+        {(open || retained) && (
+          <>
+            <div className="sheet-header">
+              <h2 id={titleId}>{title}</h2>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="إغلاق النافذة"
+                onClick={requestClose}
+                autoFocus
+              >
+                <X size={22} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="sheet-body">{children}</div>
+          </>
+        )}
       </div>
     </dialog>
   );

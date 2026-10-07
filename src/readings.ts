@@ -60,6 +60,15 @@ export function createReadingsClient(
   return {
     load,
     peek: (key: string) => cache.get(key),
+    // Background failures are intentionally silent; load retains normal retry behavior.
+    prefetchDay: (day: number): Promise<void> => {
+      if (!Number.isInteger(day) || day < 1 || day > 150)
+        return Promise.resolve();
+      return load(String(day)).then(
+        () => {},
+        () => {},
+      );
+    },
   };
 }
 export const readings = createReadingsClient();

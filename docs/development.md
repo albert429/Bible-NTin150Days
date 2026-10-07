@@ -14,6 +14,7 @@
 | `src/{readings,useReading}.ts`                      | Static fetching, validation, cache, deduplication, stale-response protection |
 | `src/progress.ts`                                   | Validated local profiles, completion, backups, and restore                   |
 | `src/useAppearance.ts`                              | Saved font size and theme preferences                                        |
+| `src/useAdjacentPrefetch.ts`                        | Deferred, connection-aware preparation of neighbouring readings              |
 | `src/appInfo.ts`                                    | App credits, contact links, and Scripture source                             |
 | `data/`                                             | Canonical Scripture plan and extracted source table                          |
 | `scripts/`                                          | Static build, imports, asset regeneration, visual and performance checks     |
@@ -43,6 +44,10 @@ Visual and performance scripts expect a running `npm start`. `BASELINE_URL` opti
 `nt-reading-progress-v1` stores profiles, the active reader, personal start dates, and completed days in localStorage. Backup imports create a separate profile. `word-font` and `word-dark` preserve appearance settings. Clearing site data or moving to another browser/domain requires restoring a saved backup to retain progress.
 
 Schedules use Cairo dates. Catch-up and advance reading do not move a reader's start date. Daily JSON is cached in memory during the browser session, with concurrent requests deduplicated; failed requests can be retried. This is not a persistent offline/PWA implementation.
+
+While reading, adjacent days are prepared 500ms after the selected day and its fonts settle. Save-Data and reported slow-2g, 2g, or 3g connections suppress this background work; browsers without connection information allow it. Navigation cancels queued work, while already-started requests remain shared with foreground loading. Speculative failures are silent and do not prevent a later retry.
+
+Closed sheets keep only their native dialog shell mounted. Their content mounts on opening and stays mounted through the exit animation. Opening takes 150ms and closing takes 100ms, with animation completion and a CSS-duration fallback coordinating queued actions. Reduced motion closes immediately. Scripture and font-size changes are not animated.
 
 ## Static hosting
 
@@ -74,3 +79,5 @@ The mobile redesign was checked at 320, 360, 390, and 430px, landscape, dark/lig
 Three identically throttled mobile Lighthouse runs before/after the redesign produced median performance scores **82 → 87**, LCP **3,754 → 3,693ms**, and CLS **0.154 → 0.082**, with accessibility **100**. These are local measurements rather than guaranteed scores on every device. Re-run the audit when changes affect initial rendering or assets.
 
 The subsequent repository refactor and About addition were compared against release `e5204db` with three runs per build under identical throttling: median performance **87 → 87**, accessibility **100 → 100**, LCP **3,680 → 3,678ms**, and CLS **0.08646 → 0.08646**. Initial transfer increased by about 0.3KB. The README images are documentation-only and do not load in the app.
+
+The focused responsiveness pass was compared against `781e060`, with three runs per build under the same mobile Lighthouse throttling: median performance **87 → 88**, accessibility **100 → 100**, LCP **3,678 → 3,604ms**, CLS **0.08646 → 0.08646**, and total transfer **525.2 → 501.8KB**, including speculative reading requests. The hidden 192px menu logo no longer loads before opening the menu. In three separate Chromium mobile runs with 150ms network latency and 200,000 bytes/s download throughput, tapping Next after a 1.5s settling period took a median **183.6 → 7.5ms** to paint the next reading. The prefetched reading showed no loading placeholder. These are controlled local measurements, not guarantees for every connection or device.
