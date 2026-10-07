@@ -1,5 +1,11 @@
 import { lazy, Suspense, useRef, useState } from "react";
-import { Menu, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import {
+  Menu,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Settings,
+} from "lucide-react";
 import type { Reader } from "../progress";
 import type { Day } from "../readings";
 import { ar } from "../format";
@@ -135,7 +141,7 @@ export default function Navigation({
             aria-expanded={open && panel === "appearance"}
             onClick={(event) => show("appearance", event.currentTarget)}
           >
-            <span aria-hidden="true">أ</span>
+            <Settings size={20} aria-hidden="true" />
           </button>
         </div>
       </header>
