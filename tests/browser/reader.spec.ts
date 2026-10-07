@@ -1,32 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { closeSheet, key, noOverflow, profile, ready, seed } from "./helpers";
 
-const key = "nt-reading-progress-v1";
-const profile = {
-  id: "reader-one",
-  name: "ميخائيل",
-  startDate: "2026-09-22",
-  completed: [2, 4],
-};
 test.use({ reducedMotion: "reduce" });
 
-async function seed(page: Page, selected = true) {
-  await page.clock.install({ time: new Date("2026-10-01T12:00:00Z") });
-  await page.addInitScript(
-    ({ key, profile, selected }) => {
-      if (!localStorage.getItem(key))
-        localStorage.setItem(
-          key,
-          JSON.stringify({
-            version: 1,
-            activeId: selected ? profile.id : null,
-            profiles: [profile],
-          }),
-        );
-    },
-    { key, profile, selected },
-  );
-}
 async function menu(page: Page, target: string) {
   await page.getByRole("button", { name: "فتح القائمة", exact: true }).click();
   await page
@@ -34,33 +11,15 @@ async function menu(page: Page, target: string) {
     .getByRole("button", { name: target, exact: true })
     .click();
 }
-async function ready(page: Page) {
-  await expect(page.locator(".scripture")).toBeVisible();
-  await page.evaluate(() => document.fonts.ready);
-}
 async function appearance(page: Page) {
   await page
     .getByRole("button", { name: "إعدادات القراءة", exact: true })
     .click();
   return page.getByRole("dialog", { name: "إعدادات القراءة", exact: true });
 }
-async function closeSheet(page: Page) {
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "إغلاق النافذة", exact: true })
-    .click();
-  await expect(page.locator("dialog[open]")).toHaveCount(0);
-}
 async function dayDetails(page: Page) {
   await page.getByRole("button", { name: /^تفاصيل اليوم / }).click();
   return page.getByRole("dialog", { name: /^قراءة اليوم / });
-}
-async function noOverflow(page: Page) {
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth + 1,
-    ),
-  ).toBe(true);
 }
 test("subtle menu footer opens app credits and restores focus without changing reading", async ({
   page,
