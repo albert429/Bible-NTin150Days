@@ -1,3 +1,4 @@
+import "./study.css";
 import { Loading, LoadError } from "../components/Feedback";
 import type { Day, Verse } from "../readings";
 import { usfmFor } from "./books";

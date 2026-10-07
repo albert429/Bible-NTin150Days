@@ -8,6 +8,16 @@ eBible.org classifies this source edition as **public domain**. The Scripture wo
 
 Source archive: [arb-vd USFM](https://ebible.org/Scriptures/arb-vd_usfm.zip). Import provenance and coverage counts are recorded in [data/SOURCES.md](data/SOURCES.md).
 
+## Study data
+
+The verse study panel uses openly licensed data. It is stored in `data/study/` and split per day into `public/study/` (also shipped as [`/licenses/study-data.txt`](public/licenses/study-data.txt)). These files are licensed under the data licences below, separately from the app code, which remains all rights reserved. Changes made: extraction of the fields used, normalisation, removal of markup, re-keying by verse, and per-day splitting. Full details: [data/study/LICENSE.md](data/study/LICENSE.md).
+
+- **Cross-references** — [openbible.info](https://www.openbible.info/labs/cross-references/), CC BY 4.0.
+- **Greek–Arabic word tags (TTAraSVD)** — STEPBible.org, CC BY-SA 4.0. The original work by STEPBible.org, and Arabic Bible Outreach Ministry, is available for free at ["STEPBible Arabic Bibles"](https://github.com/STEPBible/STEPBible-Data/tree/master/Tagged-Bibles/Arabic%20Bibles). Arabic text digitisation, formatting and diacritics by Arabic Bible Outreach Ministry (https://www.arabicbible.com/).
+- **Greek lexicon (TBESG)** — STEPBible.org, based on work at Tyndale House Cambridge, CC BY 4.0.
+- **New Arabic Version (كتاب الحياة)** — Copyright © 1988, 1997, 2012 Biblica, Inc.® CC BY-SA 4.0. The original work by Biblica, Inc. is available for free at www.biblica.com and open.bible. Shown verbatim with markup removed; as a derivative work it is labelled «الترجمة العربية الجديدة (كتاب الحياة)» without the Biblica® mark. “Biblica” is a trademark registered in the United States Patent and Trademark Office by Biblica, Inc.
+- **Old Testament preview text** — Arabic Van Dyck (`arb-vd`), public domain, as above.
+
 ## Fonts
 
 - **Amiri** — Copyright 2010–2022 The Amiri Project Authors. [Bundled SIL Open Font License 1.1](public/fonts/Amiri-OFL.txt).
