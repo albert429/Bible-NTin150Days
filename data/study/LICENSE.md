@@ -47,7 +47,8 @@ New Testament, with their positions in the Van Dyck Arabic text.
 
 Old Testament preview text from the Arabic Van Dyck Bible (eBible `arb-vd`),
 https://ebible.org/bible/details.php?id=arb-vd. Only verses used as cross-reference
-previews are included.
+previews are included. `ot-chapters.json` lists the number of verses in each Old Testament
+chapter of the same edition, used to count the rest of a long cross-reference range.
 
 ## `nav.json` — CC BY-SA 4.0
 

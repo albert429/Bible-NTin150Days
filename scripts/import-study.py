@@ -169,6 +169,8 @@ def strip_definition(value: str) -> str:
     value = re.sub(r"<ref=[^>]*>(.*?)</ref>", r"\1", value, flags=re.S)
     value = re.sub(r"<br\s*/?>", " ", value, flags=re.I)
     value = html.unescape(re.sub(r"<[^>]+>", "", value))
+    # Septuagint (Hebrew equivalent) notes say little about NT meaning; keep the senses.
+    value = re.sub(r"\[\s*in LXX[^\]]*\]", "", value)
     value = " ".join(value.split())
     if len(value) > 400:
         value = value[:400].rsplit(" ", 1)[0] + "…"
@@ -383,6 +385,8 @@ def main() -> None:
         ("lexicon.json", lexicon),
         ("xrefs.json", xrefs),
         ("ot-vd.json", ot_verses),
+        # Verse counts per OT chapter, so ranges crossing a chapter can be counted.
+        ("ot-chapters.json", {c: [len(vd[c][0][n]) for n in sorted(vd[c][0])] for c in codes[:39]}),
         ("nav.json", nav),
     ):
         print(f"  wrote data/study/{name}: {write(name, data) / 1e6:.2f} MB")
