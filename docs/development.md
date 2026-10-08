@@ -97,7 +97,7 @@ npm run validate
 
 The importer fails unless at least 99.5% of NT verses have Textus Receptus Greek, 97% align to Van Dyck word positions, at most 0.5% of tokens miss the lexicon, at most 1% of cross-reference targets fail to resolve in Van Dyck versification, NAV covers 98% of verses, and every book code is known. Expected coverage line:
 
-> 7959 NT verses; 7959 with Greek (100.00%); 140993 TR tokens; aligned 99.51%; lexicon 5675 entries (0 token misses); xrefs 64242 kept for 7762 verses, 7 of 112501 dropped as unresolved; 8756 OT preview verses; NAV 99.97%
+> 7959 NT verses; 7959 with Greek (100.00%); 140993 TR tokens; aligned 99.56%; lexicon 5675 entries (0 token misses); xrefs 64242 kept for 7762 verses, 7 of 112501 dropped as unresolved; 8756 OT preview verses; NAV 99.97%
 
 `build-study.js` keeps at most **7** cross-references per verse and shortens per-day lexicon definitions to **160** characters so the busiest day stays within gzip budgets of 30KB (core), 35KB (refs) and 35KB (lexicon); 8 references and full 400-character definitions did not fit.
 

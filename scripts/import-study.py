@@ -57,23 +57,18 @@ def check_contiguous(books: dict) -> None:
                 fail(f"{code} {chapter}: empty verse text")
 
 
-def check_plan(plan: list, vd: dict, usfm_for: dict) -> tuple[dict, list]:
+def check_plan(plan: list, vd: dict, usfm_for: dict) -> dict:
     """Plan text must equal the USFM text; returns NT display text keyed by verse ID."""
-    text, truncated = {}, set()
+    text = {}
     for day in plan:
         for passage in day["passages"]:
             code = usfm_for[passage["book"]]
             for verse in passage["verses"]:
                 key = f"{code}.{passage['chapter']}.{verse['number']}"
-                source = vd[code][0][passage["chapter"]][verse["number"]]
-                if verse["text"] != source:
-                    # scripts/import.py reads only the \v line, so a verse continued on a
-                    # later USFM line is shortened in plan.json. Known, reported, not fixed here.
-                    if not source.startswith(verse["text"] + " "):
-                        fail(f"plan.json text differs from USFM at {key}")
-                    truncated.add(key)
+                if verse["text"] != vd[code][0][passage["chapter"]][verse["number"]]:
+                    fail(f"plan.json text differs from USFM at {key}")
                 text[key] = verse["text"]
-    return text, sorted(truncated)
+    return text
 
 
 def parse_ttarasvd(path: Path, step_codes: dict) -> tuple[dict, Counter]:
@@ -252,7 +247,7 @@ def main() -> None:
     # 1. Van Dyck, all 66 books.
     vd = read_zip_books(args.vd, "arb-vd", codes)
     check_contiguous(vd)
-    nt_text, truncated = check_plan(plan, vd, usfm_for)
+    nt_text = check_plan(plan, vd, usfm_for)
     nt_ids = [
         f"{code}.{c}.{v}" for code in nt_codes for c, verses in vd[code][0].items() for v in verses
     ]
@@ -365,8 +360,7 @@ def main() -> None:
         f"lexicon {len(lexicon)} entries ({lex_misses} token misses); "
         f"xrefs {sum(map(len, xrefs.values()))} kept for {len(xrefs)} verses, "
         f"{xref_dropped} of {xref_seen} dropped as unresolved; "
-        f"{len(ot_verses)} OT preview verses; NAV {len(nav) / len(nt_ids):.2%}; "
-        f"plan.json truncations: {', '.join(truncated) or 'none'}"
+        f"{len(ot_verses)} OT preview verses; NAV {len(nav) / len(nt_ids):.2%}"
     )
     print(coverage)
     for name, count in stats.items():
