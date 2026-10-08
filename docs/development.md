@@ -8,7 +8,7 @@
 | `src/App.tsx`                                       | Reader state, navigation, progress actions, and application dialogs          |
 | `src/components/Reader.tsx`                         | Continuous Arabic Scripture, verse tap/keyboard trigger, and completion      |
 | `src/components/VerseStudy.tsx`                     | Verse study sheet shell; loads the study chunk on demand                     |
-| `src/study/`                                        | Lazy verse study panel: Greek words, cross-references, other translation     |
+| `src/study/`                                        | Lazy verse study panel: Greek key words, cross-references, translations      |
 | `src/jsonClient.ts`                                 | Shared static JSON loader: cache, deduplication, timeout, validation         |
 | `src/components/Navigation.tsx`                     | Sticky toolbar and sheet coordination                                        |
 | `src/components/navigation/`                        | Menu, day details, and appearance panels                                     |
@@ -23,7 +23,7 @@
 | `data/books.json`                                   | 66 books: USFM, OSIS and STEPBible codes with Arabic names                   |
 | `data/study/`                                       | Imported study data (CC BY / CC BY-SA; see `data/study/LICENSE.md`)          |
 | `scripts/import-study.py`                           | Builds `data/study/` from downloaded sources, with coverage gates            |
-| `scripts/build-study.js`                            | Splits study data into `public/study/{day}[.refs\|.lex].json` with budgets   |
+| `scripts/build-study.js`                            | Splits study data into `public/study/{day}[.refs\|.tr\|.lex].json`, budgets  |
 | `scripts/`                                          | Static build, imports, asset regeneration, visual and performance checks     |
 | `tests/`                                            | Unit/data checks and mobile browser workflows                                |
 | `docs/assets/`                                      | README artwork and actual app screenshot; never shipped in the app           |
@@ -54,7 +54,9 @@ Schedules use Cairo dates. Catch-up and advance reading do not move a reader's s
 
 While reading, adjacent days are prepared 500ms after the selected day and its fonts settle. Save-Data and reported slow-2g, 2g, or 3g connections suppress this background work; browsers without connection information allow it. Navigation cancels queued work, while already-started requests remain shared with foreground loading. Speculative failures are silent and do not prevent a later retry.
 
-Tapping a verse opens its study sheet; a text selection, a press longer than 500ms, or a movement over 10px does not. The verse number is a button for keyboard and screen-reader users. The first press on the reading warms the study code chunk (skipped under Save-Data or slow connections); opening a verse fetches that day's `{day}.json` and `{day}.refs.json`. The study sheet stays mounted after first use.
+Tapping a verse opens its study sheet; a text selection, a press longer than 500ms, or a movement over 10px does not. The verse number is a button for keyboard and screen-reader users. The first press on the reading warms the study code chunk (skipped under Save-Data or slow connections); opening a verse fetches that day's `{day}.json` and `{day}.refs.json`, and opening «ترجمات أخرى» fetches `{day}.tr.json` (New Arabic Version and KJV). The study sheet stays mounted after first use.
+
+The Greek list shows key words only: nouns, verbs, adjectives and interjections, each Greek word once per verse, as Arabic ← Greek with transliteration and gloss. Articles, pronouns, prepositions, conjunctions, particles and adverbs stay in the data (for the planned AI explanations) but are not listed. Cross-references leave out verses inside the passage where the verse is read, since they are already on screen.
 
 Closed sheets keep only their native dialog shell mounted. Their content mounts on opening and stays mounted through the exit animation. Opening takes 150ms and closing takes 100ms, with animation completion and a CSS-duration fallback coordinating queued actions. Reduced motion closes immediately. Scripture and font-size changes are not animated.
 
@@ -88,18 +90,19 @@ S=/path/to/empty/sources
 STEP=https://raw.githubusercontent.com/STEPBible/STEPBible-Data/1f3423d42400f59f1f30fe08f74e38fcd3bbf7bc
 curl -L --fail https://ebible.org/Scriptures/arb-vd_usfm.zip -o "$S/arb-vd.zip"
 curl -L --fail https://ebible.org/Scriptures/arbnav_usfm.zip -o "$S/arbnav.zip"
+curl -L --fail https://ebible.org/Scriptures/eng-kjv_usfm.zip -o "$S/eng-kjv.zip"
 curl -L --fail https://a.openbible.info/data/cross-references.zip -o "$S/xrefs.zip"
 curl -L --fail "$STEP/Tagged-Bibles/Arabic%20Bibles/TTAraSVD%20-%20Translation%20Tags%20for%20Arabic%20SVD%20-%20STEPBible.org%20CC%20BY-SA_NT_4_0_1.txt" -o "$S/ttarasvd-nt.txt"
 curl -L --fail "$STEP/Lexicons/TBESG%20-%20Translators%20Brief%20lexicon%20of%20Extended%20Strongs%20for%20Greek%20-%20STEPBible.org%20CC%20BY.txt" -o "$S/tbesg.txt"
-python3 -I scripts/import-study.py --vd "$S/arb-vd.zip" --nav "$S/arbnav.zip" --xrefs "$S/xrefs.zip" --tbesg "$S/tbesg.txt" --ttarasvd "$S/ttarasvd-nt.txt"
+python3 -I scripts/import-study.py --vd "$S/arb-vd.zip" --nav "$S/arbnav.zip" --kjv "$S/eng-kjv.zip" --xrefs "$S/xrefs.zip" --tbesg "$S/tbesg.txt" --ttarasvd "$S/ttarasvd-nt.txt"
 npm run validate
 ```
 
-The importer fails unless at least 99.5% of NT verses have Textus Receptus Greek, 97% align to Van Dyck word positions, at most 0.5% of tokens miss the lexicon, at most 1% of cross-reference targets fail to resolve in Van Dyck versification, NAV covers 98% of verses, and every book code is known. Expected coverage line:
+The importer fails unless at least 99.5% of NT verses have Textus Receptus Greek, 97% align to Van Dyck word positions, at most 0.5% of tokens miss the lexicon, at most 1% of cross-reference targets fail to resolve in Van Dyck versification, NAV covers 98% and the KJV 99.5% of verses, and every book code is known. Expected coverage line:
 
-> 7959 NT verses; 7959 with Greek (100.00%); 140993 TR tokens; aligned 99.56%; lexicon 5675 entries (0 token misses); xrefs 64242 kept for 7762 verses, 7 of 112501 dropped as unresolved; 8756 OT preview verses; NAV 99.97%
+> 7959 NT verses; 7959 with Greek (100.00%); 140993 TR tokens; aligned 99.56%; lexicon 5675 entries (0 token misses); xrefs 62924 kept for 7715 verses, 7 of 112501 dropped as unresolved, 4192 inside the passage being read; 8905 OT preview verses; NAV 99.97%; KJV 99.97%
 
-`build-study.js` keeps at most **7** cross-references per verse and shortens per-day lexicon definitions to **160** characters so the busiest day stays within gzip budgets of 30KB (core), 35KB (refs) and 35KB (lexicon); 8 references and full 400-character definitions did not fit.
+`build-study.js` keeps at most **7** cross-references per verse and shortens per-day lexicon definitions to **160** characters so the busiest day stays within gzip budgets of 30KB (core), 35KB (refs), 30KB (translations) and 35KB (lexicon); 8 references and full 400-character definitions did not fit.
 
 To regenerate committed font and logo assets, install Python packages `fonttools brotli pillow` and run `python3 scripts/optimize-assets.py`. Production deployment does not require Python. Original fonts and logo sources are preserved; license texts are bundled under `public/fonts/`.
 

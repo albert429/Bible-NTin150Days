@@ -12,11 +12,12 @@ const xrefs = read("data/study/xrefs.json");
 const otText = read("data/study/ot-vd.json");
 const otChapters = read("data/study/ot-chapters.json");
 const nav = read("data/study/nav.json");
+const kjv = read("data/study/kjv.json");
 
 // Tuned so the busiest day fits BUDGETS (8 refs and 400-character definitions did not).
 export const MAX_XREFS = 7;
 export const DEF_CHARS = 160;
-export const BUDGETS = { core: 30000, refs: 35000, lex: 35000 };
+export const BUDGETS = { core: 30000, refs: 35000, lex: 35000, tr: 30000 };
 const output = new URL("../public/study/", import.meta.url);
 mkdirSync(output, { recursive: true });
 
@@ -85,7 +86,7 @@ const write = (name, data) => {
   return gzipSync(body).length;
 };
 
-const max = { core: 0, refs: 0, lex: 0 };
+const max = { core: 0, refs: 0, lex: 0, tr: 0 };
 const firstEntry = new Map();
 for (const day of plan) {
   const p = day.passages.map((passage) => {
@@ -96,6 +97,8 @@ for (const day of plan) {
   const verses = {};
   const refs = {};
   const lex = {};
+  // Other translations load only when a reader opens that section.
+  const tr = {};
   day.passages.forEach((passage, index) => {
     for (const verse of passage.verses) {
       const id = `${p[index]}.${passage.chapter}.${verse.number}`;
@@ -107,7 +110,9 @@ for (const day of plan) {
         if (lexicon[strong]) lex[strong] = shortLex(lexicon[strong]);
       }
       const entry = { g, x: (xrefs[id] || []).slice(0, MAX_XREFS) };
-      if (nav[id] !== undefined) entry.n = nav[id];
+      tr[id] = {};
+      if (nav[id] !== undefined) tr[id].n = nav[id];
+      if (kjv[id] !== undefined) tr[id].e = kjv[id];
       for (const ref of entry.x) refs[ref] ??= refEntry(ref);
       const previous = firstEntry.get(id);
       if (previous && JSON.stringify(previous) !== JSON.stringify(entry))
@@ -120,6 +125,7 @@ for (const day of plan) {
     core: write(`${day.day}.json`, { v: 1, day: day.day, p, verses }),
     refs: write(`${day.day}.refs.json`, { v: 1, day: day.day, refs }),
     lex: write(`${day.day}.lex.json`, { v: 1, day: day.day, lex }),
+    tr: write(`${day.day}.tr.json`, { v: 1, day: day.day, verses: tr }),
   };
   for (const [kind, size] of Object.entries(sizes)) {
     if (size > BUDGETS[kind])
@@ -130,5 +136,5 @@ for (const day of plan) {
   }
 }
 console.log(
-  `Generated ${plan.length} study days (max gzip: core ${max.core} B, refs ${max.refs} B, lex ${max.lex} B).`,
+  `Generated ${plan.length} study days (max gzip: core ${max.core} B, refs ${max.refs} B, lex ${max.lex} B, translations ${max.tr} B).`,
 );

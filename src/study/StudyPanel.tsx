@@ -44,10 +44,10 @@ export default function StudyPanel({
         error={refs.error}
         retry={refs.retry}
       />
-      <OtherTranslation n={entry.n} />
+      <OtherTranslation day={day} id={id} />
       <p className="study-sources">
         <a href="/licenses/study-data.txt" target="_blank" rel="noopener">
-          المصادر: STEPBible · OpenBible.info · كتاب الحياة (CC BY-SA)
+          المصادر والتراخيص
         </a>
       </p>
     </div>

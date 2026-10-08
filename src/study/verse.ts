@@ -66,3 +66,23 @@ export function groupRows(g: GreekToken[]): GreekGroup[] {
   }
   return groups;
 }
+
+// Nouns, verbs, adjectives and interjections carry a verse's meaning; articles,
+// pronouns, prepositions, conjunctions, particles and adverbs are left out.
+const KEY_MORPH = /^(?:N|V|A|INJ)\b/;
+
+/** Key words only, each Greek word (by Strong's number) listed once per verse. */
+export function keyGroups(g: GreekToken[]): GreekGroup[] {
+  const seen = new Set<string>();
+  const result: GreekGroup[] = [];
+  for (const group of groupRows(g)) {
+    const tokens = group.tokens.filter(([, , strong, morph]) => {
+      const key = strong.slice(0, 5);
+      if (!KEY_MORPH.test(morph) || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    if (tokens.length) result.push({ ...group, tokens });
+  }
+  return result;
+}

@@ -54,7 +54,8 @@ export default function About() {
           STEPBible.org
         </a>{" "}
         والخدمة العربية للكرازة بالإنجيل (CC BY-SA وCC BY)، والترجمة العربية
-        الجديدة (كتاب الحياة) © Biblica, Inc. (CC BY-SA).{" "}
+        الجديدة (كتاب الحياة) © Biblica, Inc. (CC BY-SA)، والترجمة الإنجليزية
+        الملك جيمس (KJV، ملكية عامة).{" "}
         <a href="/licenses/study-data.txt" target="_blank" rel="noreferrer">
           تفاصيل التراخيص
         </a>

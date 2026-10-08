@@ -14,6 +14,7 @@ test("Static study days match the study data for every plan verse", () => {
   const greek = read("data/study/greek.json");
   const xrefs = read("data/study/xrefs.json");
   const nav = read("data/study/nav.json");
+  const kjv = read("data/study/kjv.json");
   const usfm = new Map(books.map((row) => [row[3], row[0]]));
   const seen = new Map();
   assert.equal(plan.length, 150);
@@ -21,7 +22,8 @@ test("Static study days match the study data for every plan verse", () => {
     const core = read(`public/study/${day.day}.json`);
     const refs = read(`public/study/${day.day}.refs.json`);
     const lex = read(`public/study/${day.day}.lex.json`);
-    for (const file of [core, refs, lex]) {
+    const tr = read(`public/study/${day.day}.tr.json`);
+    for (const file of [core, refs, lex, tr]) {
       assert.equal(file.v, 1);
       assert.equal(file.day, day.day);
     }
@@ -34,9 +36,14 @@ test("Static study days match the study data for every plan verse", () => {
         const id = `${usfm.get(passage.book)}.${passage.chapter}.${verse.number}`;
         const entry = core.verses[id];
         assert.ok(entry, id);
-        assert.deepEqual(entry.g, greek[id] || []);
-        assert.deepEqual(entry.x, (xrefs[id] || []).slice(0, MAX_XREFS));
-        assert.deepEqual(entry.n, nav[id]);
+        assert.deepEqual(entry, {
+          g: greek[id] || [],
+          x: (xrefs[id] || []).slice(0, MAX_XREFS),
+        });
+        assert.deepEqual(tr.verses[id], {
+          ...(nav[id] !== undefined && { n: nav[id] }),
+          ...(kjv[id] !== undefined && { e: kjv[id] }),
+        });
         for (const ref of entry.x) assert.ok(refs.refs[ref]?.t[0]?.[2], ref);
         for (const token of entry.g)
           if (token[2] && token[5] !== null) assert.ok(token[5] <= token[6]);
@@ -48,6 +55,7 @@ test("Static study days match the study data for every plan verse", () => {
       ["core", `${day.day}.json`],
       ["refs", `${day.day}.refs.json`],
       ["lex", `${day.day}.lex.json`],
+      ["tr", `${day.day}.tr.json`],
     ])
       assert.ok(
         gzipSync(raw("public/study/" + name)).length <= BUDGETS[kind],

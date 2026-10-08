@@ -51,6 +51,12 @@ test("tapping a verse opens its study sheet and only then loads study data", asy
     "ltr",
   );
   await expect(study(page).locator(".greek-ar").first()).not.toHaveText("—");
+  // Key words only: no Strong's numbers and no Greek word listed twice.
+  const words = await study(page).locator(".greek-word").allTextContents();
+  expect(new Set(words).size).toBe(words.length);
+  await expect(study(page).locator(".greek-meta").first()).not.toContainText(
+    /G\d/,
+  );
   expect(requests.filter((r) => r.startsWith("/study/")).sort()).toEqual([
     "/study/10.json",
     "/study/10.refs.json",
@@ -156,7 +162,7 @@ test("the study sheet is accessible in both themes and fits 320px at 38px text",
     await expect(study(page).locator(".greek-row").first()).toBeVisible();
     await study(page).locator(".xref-toggle").first().click();
     await study(page).locator("summary", { hasText: "ترجمات أخرى" }).click();
-    await expect(study(page).locator(".study-translation")).toBeVisible();
+    await expect(study(page).locator(".study-english")).toBeVisible();
     await noOverflow(page);
     const result = await new AxeBuilder({ page })
       .include("dialog[open]")
@@ -165,6 +171,30 @@ test("the study sheet is accessible in both themes and fits 320px at 38px text",
     expect(result.violations).toEqual([]);
     await closeSheet(page);
   }
+});
+
+test("other translations load only when opened and include the KJV", async ({
+  page,
+}) => {
+  await seed(page);
+  const requests = studyRequests(page);
+  await page.goto("/");
+  await ready(page);
+  await tap(page, 1);
+  await expect(study(page).locator(".greek-row").first()).toBeVisible();
+  await page.waitForTimeout(300);
+  expect(requests).not.toContain("/study/10.tr.json");
+
+  await study(page).locator("summary", { hasText: "ترجمات أخرى" }).click();
+  const english = study(page).locator(".study-english");
+  await expect(english).toHaveText(
+    "And he touched her hand, and the fever left her: and she arose, and ministered unto them.",
+  );
+  await expect(english).toHaveAttribute("lang", "en");
+  await expect(
+    study(page).getByText("كتاب الحياة", { exact: true }),
+  ).toBeVisible();
+  expect(requests.filter((r) => r === "/study/10.tr.json")).toHaveLength(1);
 });
 
 test("a failed study request offers a retry that recovers", async ({

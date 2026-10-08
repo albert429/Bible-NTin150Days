@@ -1,5 +1,5 @@
 import { createJsonClient } from "../jsonClient.ts";
-import type { LexDay, StudyDay, StudyRefs } from "./types.ts";
+import type { LexDay, StudyDay, StudyRefs, TrDay } from "./types.ts";
 
 const message = () => "تعذر تحميل دراسة الآية. تحقق من الاتصال وحاول مرة أخرى.";
 const header = (data: unknown, key: string) =>
@@ -23,6 +23,12 @@ export const studyRefs = createJsonClient<StudyRefs>({
   validate: (data, key): data is StudyRefs =>
     header(data, key) && isObject((data as StudyRefs).refs),
   message,
+});
+export const studyTr = createJsonClient<TrDay>({
+  url: (day) => `/study/${day}.tr.json`,
+  validate: (data, key): data is TrDay =>
+    header(data, key) && isObject((data as TrDay).verses),
+  message: () => "تعذر تحميل الترجمات. تحقق من الاتصال وحاول مرة أخرى.",
 });
 export const studyLex = createJsonClient<LexDay>({
   url: (day) => `/study/${day}.lex.json`,
