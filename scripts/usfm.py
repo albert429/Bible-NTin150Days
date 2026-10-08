@@ -10,9 +10,13 @@ TOKEN = re.compile(r"\\c\s+(\d+)|\\v\s+(\d+)(?:-(\d+))?\s")
 
 
 def clean(value: str) -> str:
-    # Same note and marker stripping as scripts/import.py, then collapse whitespace.
+    # Notes and markers as in scripts/import.py, plus word attributes
+    # (\w word|strong="G3056"\w*), nested \+ markers and KJV pilcrows.
     value = re.sub(r"\\f .*?\\f\*|\\x .*?\\x\*", "", value, flags=re.S)
-    value = re.sub(r"\\[a-z0-9]+\*?\s?", "", value)
+    value = re.sub(r"\|[^\\]*(?=\\\+?[a-z0-9]+\*)", "", value)
+    # A closing marker keeps the following space ("\w In\w* the" -> "In the").
+    value = re.sub(r"\\\+?[a-z0-9]+\*", "", value)
+    value = re.sub(r"\\\+?[a-z0-9]+\s?", "", value).replace("¶", "")
     if "\\" in value:
         raise ValueError(f"Unprocessed USFM marker: {value}")
     return " ".join(value.split())

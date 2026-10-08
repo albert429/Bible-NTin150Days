@@ -41,7 +41,8 @@ New Testament, with their positions in the Van Dyck Arabic text.
   (file header dated 2026-10-05).
 - Licence: https://creativecommons.org/licenses/by/4.0/
 - Changes: kept New Testament sources with positive votes, the ten highest-voted targets per
-  verse, and only targets that exist in Van Dyck versification.
+  verse, and only targets that exist in Van Dyck versification; left out targets inside the
+  reading-plan passage where the source verse is read.
 
 ## `ot-vd.json` — public domain
 
@@ -49,6 +50,13 @@ Old Testament preview text from the Arabic Van Dyck Bible (eBible `arb-vd`),
 https://ebible.org/bible/details.php?id=arb-vd. Only verses used as cross-reference
 previews are included. `ot-chapters.json` lists the number of verses in each Old Testament
 chapter of the same edition, used to count the rest of a long cross-reference range.
+
+## `kjv.json` — public domain
+
+King James Version (Authorized Version), standard text of 1769, from the eBible.org edition
+courtesy of the Crosswire Bible Society and eBible.org: https://ebible.org/find/details.php?id=eng-kjv
+Public domain outside the United Kingdom, where rights in the Authorized Version are vested in the
+Crown. Changes: USFM markup, Strong's number tags and pilcrows (¶) removed; split by verse.
 
 ## `nav.json` — CC BY-SA 4.0
 
@@ -59,7 +67,6 @@ Copyright © 1988, 1997, 2012 Biblica, Inc.®
 - Source archive: https://ebible.org/Scriptures/arbnav_usfm.zip
 - Licence: https://creativecommons.org/licenses/by-sa/4.0/
 - This is a derivative work (markup removed, split by verse). As the licence requires, the
-  Biblica® trademark is not used to label it; the app calls it
-  «الترجمة العربية الجديدة (كتاب الحياة)».
+  Biblica® trademark is not used to label it; the app calls it «كتاب الحياة».
 - “Biblica” is a trademark registered in the United States Patent and Trademark Office by
   Biblica, Inc.

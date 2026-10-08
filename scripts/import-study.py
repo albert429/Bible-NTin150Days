@@ -1,7 +1,7 @@
 """Import verse-study data: Greek alignment, lexicon, cross-references and a second translation.
 
-Sources (see data/SOURCES.md): eBible arb-vd and arbnav USFM archives, OpenBible.info
-cross-references, STEPBible TTAraSVD (NT) and TBESG. Outputs go to data/study/.
+Sources (see data/SOURCES.md): eBible arb-vd, arbnav and eng-kjv USFM archives,
+OpenBible.info cross-references, STEPBible TTAraSVD (NT) and TBESG. Outputs go to data/study/.
 """
 
 import argparse
@@ -232,7 +232,7 @@ def write(name: str, data) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("vd", "nav", "xrefs", "tbesg", "ttarasvd"):
+    for name in ("vd", "nav", "kjv", "xrefs", "tbesg", "ttarasvd"):
         parser.add_argument("--" + name, type=Path, required=True)
     args = parser.parse_args()
 
@@ -291,10 +291,17 @@ def main() -> None:
             else:
                 lex_misses += 1
 
-    # 4. Cross-references.
+    # 4. Cross-references. A target inside the passage where the verse is read is
+    # already on the reader's screen, so it is left out.
+    passages = {}
+    for day in plan:
+        for passage in day["passages"]:
+            span = (usfm_for[passage["book"]], passage["chapter"], passage["start"], passage["end"])
+            for verse in passage["verses"]:
+                passages.setdefault(f"{span[0]}.{span[1]}.{verse['number']}", set()).add(span)
     with zipfile.ZipFile(args.xrefs) as archive:
         rows = archive.read("cross_references.txt").decode("utf-8").split("\n")
-    candidates, xref_dropped, xref_seen = {}, 0, 0
+    candidates, xref_dropped, xref_seen, xref_on_screen = {}, 0, 0, 0
     nt_set = set(nt_codes)
     for line in rows[1:]:
         cols = line.rstrip("\r").split("\t")
@@ -314,6 +321,13 @@ def main() -> None:
             continue
         if first[0] == source[0] and (source[1], source[2]) in resolved:
             continue  # self-reference or overlapping target
+        if any(
+            first[0] == book and resolved[0][0] == resolved[-1][0] == chapter
+            and start <= resolved[0][1] and resolved[-1][1] <= end
+            for book, chapter, start, end in passages[source_key]
+        ):
+            xref_on_screen += 1
+            continue
         candidates.setdefault(source_key, []).append(
             (int(cols[2]), ref_id(first[0], first, last), first[0], resolved)
         )
@@ -332,16 +346,21 @@ def main() -> None:
                 break
         xrefs[key] = kept
 
-    # 6. New Arabic Version.
-    nav_books = read_zip_books(args.nav, "arbnav", nt_codes)
-    nav = {}
-    for key in nt_ids:
-        code, chapter, verse = key.split(".")
-        chapters, bridges = nav_books[code]
-        text = chapters.get(int(chapter), {}).get(int(verse))
-        if text:
-            bridge = bridges.get((int(chapter), int(verse)))
-            nav[key] = {"b": bridge, "t": text} if bridge else text
+    # 6. Other translations: New Arabic Version and King James Version.
+    def translation(source: Path, suffix: str) -> dict:
+        books = read_zip_books(source, suffix, nt_codes)
+        result = {}
+        for key in nt_ids:
+            code, chapter, verse = key.split(".")
+            chapters, bridges = books[code]
+            text = chapters.get(int(chapter), {}).get(int(verse))
+            if text:
+                bridge = bridges.get((int(chapter), int(verse)))
+                result[key] = {"b": bridge, "t": text} if bridge else text
+        return result
+
+    nav = translation(args.nav, "arbnav")
+    kjv = translation(args.kjv, "eng-kjv")
 
     # 7. Gates.
     unknown = [k for k in svd if k.split(".")[0] not in nt_set]
@@ -352,6 +371,7 @@ def main() -> None:
         ("tokens missing from TBESG", lex_misses / max(lex_tokens, 1), "<=", 0.005),
         ("cross-ref targets dropped", xref_dropped / max(xref_seen, 1), "<=", 0.01),
         ("NT verses covered by NAV", len(nav) / len(nt_ids), ">=", 0.98),
+        ("NT verses covered by KJV", len(kjv) / len(nt_ids), ">=", 0.995),
         ("unknown book codes", len(unknown), "<=", 0),
     ]
     coverage = (
@@ -359,8 +379,10 @@ def main() -> None:
         f"{token_total} TR tokens; aligned {aligned / len(nt_ids):.2%}; "
         f"lexicon {len(lexicon)} entries ({lex_misses} token misses); "
         f"xrefs {sum(map(len, xrefs.values()))} kept for {len(xrefs)} verses, "
-        f"{xref_dropped} of {xref_seen} dropped as unresolved; "
-        f"{len(ot_verses)} OT preview verses; NAV {len(nav) / len(nt_ids):.2%}"
+        f"{xref_dropped} of {xref_seen} dropped as unresolved, "
+        f"{xref_on_screen} inside the passage being read; "
+        f"{len(ot_verses)} OT preview verses; NAV {len(nav) / len(nt_ids):.2%}; "
+        f"KJV {len(kjv) / len(nt_ids):.2%}"
     )
     print(coverage)
     for name, count in stats.items():
@@ -382,6 +404,7 @@ def main() -> None:
         # Verse counts per OT chapter, so ranges crossing a chapter can be counted.
         ("ot-chapters.json", {c: [len(vd[c][0][n]) for n in sorted(vd[c][0])] for c in codes[:39]}),
         ("nav.json", nav),
+        ("kjv.json", kjv),
     ):
         print(f"  wrote data/study/{name}: {write(name, data) / 1e6:.2f} MB")
 
