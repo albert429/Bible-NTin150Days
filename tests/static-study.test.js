@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
-import { BUDGETS, MAX_XREFS } from "../scripts/build-study.js";
+import { BUDGETS } from "../scripts/build-study.js";
 
 const read = (path) =>
   JSON.parse(readFileSync(new URL("../" + path, import.meta.url), "utf8"));
@@ -12,7 +12,6 @@ test("Static study days match the study data for every plan verse", () => {
   const plan = read("data/plan.json");
   const books = read("data/books.json");
   const greek = read("data/study/greek.json");
-  const xrefs = read("data/study/xrefs.json");
   const nav = read("data/study/nav.json");
   const kjv = read("data/study/kjv.json");
   const usfm = new Map(books.map((row) => [row[3], row[0]]));
@@ -20,10 +19,9 @@ test("Static study days match the study data for every plan verse", () => {
   assert.equal(plan.length, 150);
   for (const day of plan) {
     const core = read(`public/study/${day.day}.json`);
-    const refs = read(`public/study/${day.day}.refs.json`);
     const lex = read(`public/study/${day.day}.lex.json`);
     const tr = read(`public/study/${day.day}.tr.json`);
-    for (const file of [core, refs, lex, tr]) {
+    for (const file of [core, lex, tr]) {
       assert.equal(file.v, 1);
       assert.equal(file.day, day.day);
     }
@@ -36,15 +34,11 @@ test("Static study days match the study data for every plan verse", () => {
         const id = `${usfm.get(passage.book)}.${passage.chapter}.${verse.number}`;
         const entry = core.verses[id];
         assert.ok(entry, id);
-        assert.deepEqual(entry, {
-          g: greek[id] || [],
-          x: (xrefs[id] || []).slice(0, MAX_XREFS),
-        });
+        assert.deepEqual(entry, { g: greek[id] || [] });
         assert.deepEqual(tr.verses[id], {
           ...(nav[id] !== undefined && { n: nav[id] }),
           ...(kjv[id] !== undefined && { e: kjv[id] }),
         });
-        for (const ref of entry.x) assert.ok(refs.refs[ref]?.t[0]?.[2], ref);
         for (const token of entry.g)
           if (token[2] && token[5] !== null) assert.ok(token[5] <= token[6]);
         if (seen.has(id)) assert.deepEqual(entry, seen.get(id));
@@ -53,7 +47,6 @@ test("Static study days match the study data for every plan verse", () => {
     }
     for (const [kind, name] of [
       ["core", `${day.day}.json`],
-      ["refs", `${day.day}.refs.json`],
       ["lex", `${day.day}.lex.json`],
       ["tr", `${day.day}.tr.json`],
     ])
