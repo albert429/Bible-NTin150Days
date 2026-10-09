@@ -9,17 +9,12 @@ export type GreekToken = [
 ];
 /** A verse's text, or the text of a bridged range ("25-26") it belongs to. */
 export type VerseText = string | { b: string; t: string };
-export type StudyVerse = { g: GreekToken[]; x: string[] };
+export type StudyVerse = { g: GreekToken[] };
 export type StudyDay = {
   v: 1;
   day: number;
   p: string[];
   verses: Record<string, StudyVerse>;
-};
-export type StudyRefs = {
-  v: 1;
-  day: number;
-  refs: Record<string, { t: [number, number, string][]; more?: number }>;
 };
 /** Other translations: New Arabic Version (n) and King James Version (e). */
 export type TrDay = {

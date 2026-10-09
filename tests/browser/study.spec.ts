@@ -57,18 +57,19 @@ test("tapping a verse opens its study sheet and only then loads study data", asy
   await expect(verse(page, 1)).toHaveAttribute("data-selected", "");
   // Every section starts collapsed, Greek last, and only the core file loads.
   await expect(study(page).locator(".study-section-title")).toHaveText([
-    "شواهد",
     "ترجمات أخرى",
     "الكلمات اليونانية",
   ]);
-  for (const title of ["شواهد", "ترجمات أخرى", "الكلمات اليونانية"])
+  for (const title of ["ترجمات أخرى", "الكلمات اليونانية"])
     await expect(section(page, title)).toHaveAttribute(
       "aria-expanded",
       "false",
     );
-  await expect(section(page, "شواهد")).toHaveAccessibleName(/^شواهد [٠-٩]+$/);
-  await expect(section(page, "شواهد")).toHaveAccessibleDescription(
-    "آيات أخرى مرتبطة بهذه الآية",
+  await expect(section(page, "الكلمات اليونانية")).toHaveAccessibleName(
+    /^الكلمات اليونانية [٠-٩]+$/,
+  );
+  await expect(section(page, "الكلمات اليونانية")).toHaveAccessibleDescription(
+    "الكلمة العربية ومقابلها في الأصل",
   );
   await page.waitForTimeout(300);
   expect(requests.filter((r) => r.startsWith("/study/"))).toEqual([
@@ -92,12 +93,6 @@ test("tapping a verse opens its study sheet and only then loads study data", asy
   await expect(study(page).locator(".greek-meta").first()).not.toContainText(
     /G\d/,
   );
-
-  await openSection(page, "شواهد");
-  await expect(study(page).locator(".xref-toggle").first()).toBeVisible();
-  await expect
-    .poll(() => requests.filter((r) => r.startsWith("/study/")).sort())
-    .toEqual(["/study/10.json", "/study/10.refs.json"]);
 
   await closeSheet(page);
   await expect(verse(page, 1)).not.toHaveAttribute("data-selected");
@@ -162,28 +157,6 @@ test("keyboard users open a verse from its number and return to it", async ({
   await expect(first).toBeFocused();
 });
 
-test("an Old Testament reference expands inline without navigating", async ({
-  page,
-}) => {
-  await seed(page);
-  await page.goto("/");
-  await ready(page);
-  const url = page.url();
-  await tap(page, 1);
-  await openSection(page, "شواهد");
-  const ref = study(page).getByRole("button", { name: /^الملوك الثاني/ });
-  await expect(ref).toHaveAttribute("aria-expanded", "false");
-  await ref.click();
-  await expect(ref).toHaveAttribute("aria-expanded", "true");
-  const panel = page.locator(
-    `[id="${await ref.getAttribute("aria-controls")}"]`,
-  );
-  await expect(panel).toBeVisible();
-  await expect(panel.locator("p").first()).toContainText("يَدْفِنُونَ");
-  expect(page.url()).toBe(url);
-  await expect(page.getByRole("article")).toHaveAttribute("data-day", "10");
-});
-
 test("the study sheet is accessible in both themes and fits 320px at 38px text", async ({
   page,
 }) => {
@@ -198,8 +171,6 @@ test("the study sheet is accessible in both themes and fits 320px at 38px text",
     }, dark);
     await tap(page, 1);
     // Everything expanded: the worst case for width and contrast.
-    await openSection(page, "شواهد");
-    await study(page).locator(".xref-toggle").first().click();
     await openSection(page, "ترجمات أخرى");
     await expect(study(page).locator(".study-english")).toBeVisible();
     // A reader taps the Greek heading at the bottom edge of the sheet; its
@@ -210,7 +181,6 @@ test("the study sheet is accessible in both themes and fits 320px at 38px text",
     await openSection(page, "الكلمات اليونانية");
     await expect(study(page).locator(".greek-row").first()).toBeInViewport();
     await expect(section(page, "الكلمات اليونانية")).toBeInViewport();
-    await expect(study(page).locator(".xref-text p").first()).toBeVisible();
     await noOverflow(page);
     const result = await new AxeBuilder({ page })
       .include("dialog[open]")

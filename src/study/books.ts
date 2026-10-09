@@ -3,7 +3,5 @@
 import books from "../../data/books.json" with { type: "json" };
 
 const byName = new Map(books.map(([usfm, , , name]) => [name, usfm]));
-const byCode = new Map(books.map(([usfm, , , name]) => [usfm, name]));
 
 export const usfmFor = (arabicName: string) => byName.get(arabicName);
-export const arabicFor = (usfm: string) => byCode.get(usfm) ?? usfm;

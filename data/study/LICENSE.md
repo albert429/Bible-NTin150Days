@@ -35,22 +35,6 @@ New Testament, with their positions in the Van Dyck Arabic text.
 - Changes: kept lemma, gloss and definition for the Strong's numbers used; HTML removed;
   definitions shortened to 400 characters.
 
-## `xrefs.json` — CC BY 4.0
-
-- Source: cross-references from openbible.info, https://www.openbible.info/labs/cross-references/
-  (file header dated 2026-10-05).
-- Licence: https://creativecommons.org/licenses/by/4.0/
-- Changes: kept New Testament sources with positive votes, the ten highest-voted targets per
-  verse, and only targets that exist in Van Dyck versification; left out targets inside the
-  reading-plan passage where the source verse is read.
-
-## `ot-vd.json` — public domain
-
-Old Testament preview text from the Arabic Van Dyck Bible (eBible `arb-vd`),
-https://ebible.org/bible/details.php?id=arb-vd. Only verses used as cross-reference
-previews are included. `ot-chapters.json` lists the number of verses in each Old Testament
-chapter of the same edition, used to count the rest of a long cross-reference range.
-
 ## `kjv.json` — public domain
 
 King James Version (Authorized Version), standard text of 1769, from the eBible.org edition

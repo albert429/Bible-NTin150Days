@@ -3,7 +3,6 @@ import { Loading, LoadError } from "../components/Feedback";
 import type { Day, Verse } from "../readings";
 import { usfmFor } from "./books";
 import { studyCore } from "./client";
-import CrossRefs from "./CrossRefs";
 import GreekWords from "./GreekWords";
 import OtherTranslation from "./OtherTranslation";
 import { useResource } from "./useResource";
@@ -21,7 +20,7 @@ export default function StudyPanel({
   verse: Verse;
 }) {
   // The core file gives each section's contents and counts; sections start
-  // collapsed and load their own files (refs, translations) when first opened.
+  // collapsed; the translations section loads its own file when first opened.
   const core = useResource(studyCore, String(day));
   const passage = reading.passages[passageIndex];
   const id = verseId(
@@ -42,7 +41,6 @@ export default function StudyPanel({
       ) : (
         <div className="study-sections">
           {/* Phase 2: the AI row goes here. */}
-          <CrossRefs day={day} ids={entry.x} />
           <OtherTranslation day={day} id={id} />
           <GreekWords text={verse.text} g={entry.g} />
         </div>

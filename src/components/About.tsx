@@ -48,15 +48,7 @@ export default function About() {
         على النص الكتابي.
       </p>
       <p className="about-rights">
-        دراسة الآيات: الشواهد من{" "}
-        <a
-          href="https://www.openbible.info/labs/cross-references/"
-          target="_blank"
-          rel="noreferrer"
-        >
-          OpenBible.info
-        </a>{" "}
-        (CC BY)، والكلمات اليونانية والقاموس من{" "}
+        دراسة الآيات: الكلمات اليونانية والقاموس من{" "}
         <a
           href="https://github.com/STEPBible/STEPBible-Data"
           target="_blank"
