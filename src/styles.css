@@ -232,7 +232,7 @@ img {
 }
 .menu-toggle img {
   width: 28px;
-  height: 32px;
+  height: 28px;
   object-fit: contain;
 }
 .toolbar-day {
@@ -873,8 +873,27 @@ input[type="date"] {
 .about-content p {
   margin: 0 0 16px;
 }
-.about-purpose {
+.about-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 100px;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.about-content .about-purpose {
+  margin: 0;
   font-size: 17px;
+}
+.about-church-logo {
+  position: relative;
+  overflow: hidden;
+}
+.about-church-logo img {
+  position: absolute;
+  left: 50%;
+  width: auto;
+  height: 100%;
+  max-width: none;
+  transform: translateX(-50%);
 }
 .about-contact-label {
   color: var(--muted);
@@ -1198,6 +1217,13 @@ input[type="date"] {
   }
 }
 @media (max-width: 299px) {
+  .about-intro {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .about-church-logo {
+    order: -1;
+    height: 96px;
+  }
   .menu-footer {
     flex-direction: column;
     align-items: stretch;
@@ -1215,7 +1241,7 @@ input[type="date"] {
   }
   .menu-toggle img {
     width: 24px;
-    height: 28px;
+    height: 24px;
   }
   .menu-toggle svg {
     width: 14px;

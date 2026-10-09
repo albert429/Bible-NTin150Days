@@ -12,7 +12,7 @@ import type { Reader } from "../../progress";
 import type { View } from "../Navigation";
 import { ar } from "../../format";
 import { APP_INFO } from "../../appInfo";
-import logoLarge from "../../assets/church-logo-192.png";
+import logo from "../../assets/favicon.svg";
 
 const links = [
   { view: "read" as const, label: "القراءة اليومية", icon: BookOpen },
@@ -47,7 +47,7 @@ export default function MenuPanel({
   return (
     <>
       <div className="menu-brand">
-        <img src={logoLarge} width="64" height="64" alt="شعار الكنيسة" />
+        <img src={logo} width="64" height="64" alt="" />
         <span>{APP_INFO.title}</span>
       </div>
       <nav className="menu-links" aria-label="قائمة التنقل">
