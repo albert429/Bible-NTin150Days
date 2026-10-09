@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { ar } from "../format";
 import { LoadError } from "../components/Feedback";
 import type { StudyRefs } from "./types";
@@ -27,7 +28,8 @@ export default function CrossRefItem({
         aria-controls={panel}
         onClick={() => setExpanded((value) => !value)}
       >
-        {refLabel(id)}
+        <span>{refLabel(id)}</span>
+        <ChevronDown className="xref-chevron" size={16} aria-hidden="true" />
       </button>
       <div id={panel} className="xref-text" hidden={!expanded}>
         {expanded &&

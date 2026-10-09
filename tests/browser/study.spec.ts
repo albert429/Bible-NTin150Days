@@ -30,6 +30,16 @@ async function tap(page: Page, index: number) {
   await page.mouse.click(x, y);
 }
 const study = (page: Page) => page.getByRole("dialog");
+/** A section's heading button; its name is the title and, if any, the count. */
+const section = (page: Page, title: string) =>
+  study(page).getByRole("button", { name: new RegExp(`^${title}( [٠-٩]+)?$`) });
+async function openSection(page: Page, title: string) {
+  await section(page, title).click();
+}
+/** The core study file has loaded once the collapsed sections appear. */
+async function sectionsReady(page: Page) {
+  await expect(section(page, "الكلمات اليونانية")).toBeVisible();
+}
 
 test("tapping a verse opens its study sheet and only then loads study data", async ({
   page,
@@ -45,6 +55,31 @@ test("tapping a verse opens its study sheet and only then loads study data", asy
   await expect(study(page)).toBeVisible();
   await expect(page.getByRole("dialog", { name: "متى ⁦٨: ١٥⁩" })).toBeVisible();
   await expect(verse(page, 1)).toHaveAttribute("data-selected", "");
+  // Every section starts collapsed, Greek last, and only the core file loads.
+  await expect(study(page).locator(".study-section-title")).toHaveText([
+    "شواهد",
+    "ترجمات أخرى",
+    "الكلمات اليونانية",
+  ]);
+  for (const title of ["شواهد", "ترجمات أخرى", "الكلمات اليونانية"])
+    await expect(section(page, title)).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  await expect(section(page, "شواهد")).toHaveAccessibleName(/^شواهد [٠-٩]+$/);
+  await expect(section(page, "شواهد")).toHaveAccessibleDescription(
+    "آيات أخرى مرتبطة بهذه الآية",
+  );
+  await page.waitForTimeout(300);
+  expect(requests.filter((r) => r.startsWith("/study/"))).toEqual([
+    "/study/10.json",
+  ]);
+
+  await openSection(page, "الكلمات اليونانية");
+  await expect(section(page, "الكلمات اليونانية")).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
   await expect(study(page).locator(".greek-row").first()).toBeVisible();
   const greek = study(page).locator('bdi[lang="grc"]').first();
   expect(await greek.evaluate((el) => getComputedStyle(el).direction)).toBe(
@@ -57,10 +92,12 @@ test("tapping a verse opens its study sheet and only then loads study data", asy
   await expect(study(page).locator(".greek-meta").first()).not.toContainText(
     /G\d/,
   );
-  expect(requests.filter((r) => r.startsWith("/study/")).sort()).toEqual([
-    "/study/10.json",
-    "/study/10.refs.json",
-  ]);
+
+  await openSection(page, "شواهد");
+  await expect(study(page).locator(".xref-toggle").first()).toBeVisible();
+  await expect
+    .poll(() => requests.filter((r) => r.startsWith("/study/")).sort())
+    .toEqual(["/study/10.json", "/study/10.refs.json"]);
 
   await closeSheet(page);
   await expect(verse(page, 1)).not.toHaveAttribute("data-selected");
@@ -133,6 +170,7 @@ test("an Old Testament reference expands inline without navigating", async ({
   await ready(page);
   const url = page.url();
   await tap(page, 1);
+  await openSection(page, "شواهد");
   const ref = study(page).getByRole("button", { name: /^الملوك الثاني/ });
   await expect(ref).toHaveAttribute("aria-expanded", "false");
   await ref.click();
@@ -159,10 +197,20 @@ test("the study sheet is accessible in both themes and fits 320px at 38px text",
       document.documentElement.dataset.theme = dark ? "dark" : "light";
     }, dark);
     await tap(page, 1);
-    await expect(study(page).locator(".greek-row").first()).toBeVisible();
+    // Everything expanded: the worst case for width and contrast.
+    await openSection(page, "شواهد");
     await study(page).locator(".xref-toggle").first().click();
-    await study(page).locator("summary", { hasText: "ترجمات أخرى" }).click();
+    await openSection(page, "ترجمات أخرى");
     await expect(study(page).locator(".study-english")).toBeVisible();
+    // A reader taps the Greek heading at the bottom edge of the sheet; its
+    // content, which opens below the fold, scrolls into view.
+    await section(page, "الكلمات اليونانية").evaluate((el) =>
+      el.scrollIntoView({ block: "end" }),
+    );
+    await openSection(page, "الكلمات اليونانية");
+    await expect(study(page).locator(".greek-row").first()).toBeInViewport();
+    await expect(section(page, "الكلمات اليونانية")).toBeInViewport();
+    await expect(study(page).locator(".xref-text p").first()).toBeVisible();
     await noOverflow(page);
     const result = await new AxeBuilder({ page })
       .include("dialog[open]")
@@ -181,11 +229,11 @@ test("other translations load only when opened and include the KJV", async ({
   await page.goto("/");
   await ready(page);
   await tap(page, 1);
-  await expect(study(page).locator(".greek-row").first()).toBeVisible();
+  await sectionsReady(page);
   await page.waitForTimeout(300);
   expect(requests).not.toContain("/study/10.tr.json");
 
-  await study(page).locator("summary", { hasText: "ترجمات أخرى" }).click();
+  await openSection(page, "ترجمات أخرى");
   const english = study(page).locator(".study-english");
   await expect(english).toHaveText(
     "And he touched her hand, and the fever left her: and she arose, and ministered unto them.",
@@ -212,7 +260,7 @@ test("a failed study request offers a retry that recovers", async ({
   await expect(retry).toBeVisible();
   fail = false;
   await retry.click();
-  await expect(study(page).locator(".greek-row").first()).toBeVisible();
+  await sectionsReady(page);
 });
 
 test("Save-Data skips warming the study chunk; the default build has no AI row", async ({
@@ -237,7 +285,7 @@ test("Save-Data skips warming the study chunk; the default build has no AI row",
   expect(requests).toEqual([]);
 
   await tap(page, 1);
-  await expect(study(page).locator(".greek-row").first()).toBeVisible();
+  await sectionsReady(page);
   await expect(study(page).getByText("اسأل الذكاء الاصطناعي")).toHaveCount(0);
   await closeSheet(page);
   const first = await verse(page, 0).boundingBox();

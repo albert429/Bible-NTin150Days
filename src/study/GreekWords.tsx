@@ -1,3 +1,4 @@
+import { Languages } from "lucide-react";
 import { keyGroups, span } from "./verse";
 import type { GreekToken } from "./types";
 import Section from "./Section";
@@ -15,7 +16,12 @@ export default function GreekWords({
   const groups = keyGroups(g);
   if (!groups.length) return null;
   return (
-    <Section title="الكلمات اليونانية" open>
+    <Section
+      title="الكلمات اليونانية"
+      hint="الكلمة العربية ومقابلها في الأصل"
+      icon={<Languages size={18} />}
+      count={groups.length}
+    >
       <ul className="greek-list">
         {groups.map((group, index) => (
           <li className="greek-row" key={index}>

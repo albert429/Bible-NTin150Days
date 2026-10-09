@@ -1,26 +1,99 @@
-import type { ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
+import { ar } from "../format";
 
+/** Scroll the sheet just enough to show an opened section, keeping its heading visible. */
+function reveal(section: HTMLElement) {
+  const scroller = section.closest(".sheet-body");
+  if (!scroller) return;
+  const view = scroller.getBoundingClientRect();
+  const box = section.getBoundingClientRect();
+  const delta = Math.min(box.bottom - view.bottom + 12, box.top - view.top - 8);
+  if (delta > 0)
+    scroller.scrollBy({
+      top: delta,
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+    });
+}
+
+/**
+ * A collapsed card (heading button + panel). Its content mounts, and loads its
+ * data, on first open, then stays mounted while the sheet is open.
+ */
 export default function Section({
   title,
-  open = false,
-  onToggle,
+  hint,
+  icon,
+  count,
   children,
 }: {
   title: string;
-  open?: boolean;
-  onToggle?: (open: boolean) => void;
+  hint: string;
+  icon: ReactNode;
+  count?: number;
   children: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const card = useRef<HTMLDivElement>(null);
+  const id = useId();
+
+  useEffect(() => {
+    const element = card.current;
+    if (!open || !element) return;
+    // Content may still be loading, so follow its growth briefly.
+    const frame = requestAnimationFrame(() => reveal(element));
+    const observer = new ResizeObserver(() => reveal(element));
+    observer.observe(element);
+    const stop = setTimeout(() => observer.disconnect(), 1200);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(stop);
+      observer.disconnect();
+    };
+  }, [open]);
+
   return (
-    <details
-      className="study-section"
-      open={open}
-      onToggle={(event) => onToggle?.(event.currentTarget.open)}
-    >
-      <summary>
-        <h3>{title}</h3>
-      </summary>
-      <div className="study-section-body">{children}</div>
-    </details>
+    <div className="study-section" data-open={open || undefined} ref={card}>
+      <h3>
+        <button
+          type="button"
+          className="study-section-toggle"
+          aria-expanded={open}
+          aria-controls={`${id}-panel`}
+          aria-labelledby={
+            count === undefined ? `${id}-title` : `${id}-title ${id}-count`
+          }
+          aria-describedby={`${id}-hint`}
+          onClick={() => {
+            setMounted(true);
+            setOpen((value) => !value);
+          }}
+        >
+          <span className="study-section-icon" aria-hidden="true">
+            {icon}
+          </span>
+          <span className="study-section-text">
+            <span id={`${id}-title`} className="study-section-title">
+              {title}
+            </span>
+            <span id={`${id}-hint`} className="study-section-hint">
+              {hint}
+            </span>
+          </span>
+          {count !== undefined && (
+            <span id={`${id}-count`} className="study-count">
+              {ar(count)}
+            </span>
+          )}
+          <ChevronDown className="study-chevron" size={18} aria-hidden="true" />
+        </button>
+      </h3>
+      <div id={`${id}-panel`} className="study-section-body" hidden={!open}>
+        {mounted && children}
+      </div>
+    </div>
   );
 }

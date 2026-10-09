@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { BookOpen } from "lucide-react";
 import { Loading, LoadError } from "../components/Feedback";
 import { studyTr } from "./client";
 import type { VerseText } from "./types";
@@ -19,7 +19,7 @@ function Translations({ day, id }: { day: number; id: string }) {
     <>
       {n && (
         <div className="study-translation">
-          <p className="study-translation-label">
+          <p className="study-tag">
             كتاب الحياة
             {typeof n === "object" && (
               <>
@@ -33,7 +33,7 @@ function Translations({ day, id }: { day: number; id: string }) {
       )}
       {e && (
         <div className="study-translation">
-          <p className="study-translation-label">الإنجليزية (KJV)</p>
+          <p className="study-tag">الإنجليزية (KJV)</p>
           <p className="study-english" lang="en" dir="ltr">
             {textOf(e)}
           </p>
@@ -43,7 +43,6 @@ function Translations({ day, id }: { day: number; id: string }) {
   );
 }
 
-/** Closed by default; its file loads the first time a reader opens it. */
 export default function OtherTranslation({
   day,
   id,
@@ -51,10 +50,13 @@ export default function OtherTranslation({
   day: number;
   id: string;
 }) {
-  const [opened, setOpened] = useState(false);
   return (
-    <Section title="ترجمات أخرى" onToggle={(open) => open && setOpened(true)}>
-      {opened && <Translations day={day} id={id} />}
+    <Section
+      title="ترجمات أخرى"
+      hint="كتاب الحياة والإنجليزية (KJV)"
+      icon={<BookOpen size={18} />}
+    >
+      <Translations day={day} id={id} />
     </Section>
   );
 }

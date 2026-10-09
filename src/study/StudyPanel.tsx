@@ -2,7 +2,7 @@ import "./study.css";
 import { Loading, LoadError } from "../components/Feedback";
 import type { Day, Verse } from "../readings";
 import { usfmFor } from "./books";
-import { studyCore, studyRefs } from "./client";
+import { studyCore } from "./client";
 import CrossRefs from "./CrossRefs";
 import GreekWords from "./GreekWords";
 import OtherTranslation from "./OtherTranslation";
@@ -20,9 +20,9 @@ export default function StudyPanel({
   reading: Day;
   verse: Verse;
 }) {
-  // Both files start loading together; Greek renders without waiting for refs.
+  // The core file gives each section's contents and counts; sections start
+  // collapsed and load their own files (refs, translations) when first opened.
   const core = useResource(studyCore, String(day));
-  const refs = useResource(studyRefs, String(day));
   const passage = reading.passages[passageIndex];
   const id = verseId(
     usfmFor(passage.book) ?? "",
@@ -30,21 +30,23 @@ export default function StudyPanel({
     verse.number,
   );
 
-  if (core.error) return <LoadError message={core.error} retry={core.retry} />;
-  if (!core.data) return <Loading label="جارٍ تحميل دراسة الآية…" />;
-  const entry = core.data.verses[id];
-  if (!entry) return <p className="study-empty">لا تتوفر دراسة لهذه الآية.</p>;
+  const entry = core.data?.verses[id];
   return (
     <div className="study">
-      {/* Phase 2: the AI row goes here. */}
-      <GreekWords text={verse.text} g={entry.g} />
-      <CrossRefs
-        ids={entry.x}
-        refs={refs.data}
-        error={refs.error}
-        retry={refs.retry}
-      />
-      <OtherTranslation day={day} id={id} />
+      {core.error ? (
+        <LoadError message={core.error} retry={core.retry} />
+      ) : !core.data ? (
+        <Loading label="جارٍ تحميل دراسة الآية…" />
+      ) : !entry ? (
+        <p className="study-empty">لا تتوفر دراسة لهذه الآية.</p>
+      ) : (
+        <div className="study-sections">
+          {/* Phase 2: the AI row goes here. */}
+          <CrossRefs day={day} ids={entry.x} />
+          <OtherTranslation day={day} id={id} />
+          <GreekWords text={verse.text} g={entry.g} />
+        </div>
+      )}
       <p className="study-sources">
         <a href="/licenses/study-data.txt" target="_blank" rel="noopener">
           المصادر والتراخيص
