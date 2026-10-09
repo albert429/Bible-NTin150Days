@@ -1,13 +1,24 @@
 import { APP_INFO } from "../appInfo";
 import ReactIcon from "./ReactIcon";
+import churchLogo from "../assets/church-logo-192.png";
 
 export default function About() {
   return (
     <section className="about-content" aria-label="معلومات التطبيق">
-      <p className="about-purpose">
-        طُوّر هذا التطبيق لشباب {APP_INFO.church}، لقراءة العهد الجديد بالترتيب
-        الزمني خلال ١٥٠ يومًا.
-      </p>
+      <div className="about-intro">
+        <p className="about-purpose">
+          طُوّر هذا التطبيق لشباب {APP_INFO.church}، لقراءة العهد الجديد
+          بالترتيب الزمني خلال ١٥٠ يومًا.
+        </p>
+        <div className="about-church-logo">
+          <img
+            src={churchLogo}
+            width="192"
+            height="192"
+            alt={APP_INFO.church}
+          />
+        </div>
+      </div>
       <p className="about-contact-label">للمزيد من المعلومات</p>
       <ul className="about-contacts">
         <li>

@@ -14,7 +14,7 @@ import Sheet from "./Sheet";
 import MenuPanel from "./navigation/MenuPanel";
 import DayPanel from "./navigation/DayPanel";
 import AppearancePanel from "./navigation/AppearancePanel";
-import logo from "../assets/church-logo-96.png";
+import logo from "../assets/favicon.svg";
 const About = lazy(() => import("./About"));
 
 export type View = "read" | "calendar" | "share";
@@ -95,7 +95,7 @@ export default function Navigation({
             aria-expanded={open && panel === "menu"}
             onClick={(event) => show("menu", event.currentTarget)}
           >
-            <img src={logo} width="28" height="32" alt="" />
+            <img src={logo} width="28" height="28" alt="" />
             <Menu size={16} aria-hidden="true" />
           </button>
           {view === "read" ? (
