@@ -1,9 +1,20 @@
-import { memo, Fragment, type CSSProperties } from "react";
+import {
+  memo,
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+  type PointerEvent,
+} from "react";
 import { Check, RotateCcw } from "lucide-react";
 import { ar } from "../format";
 import type { Day } from "../readings";
 import { Loading, LoadError } from "./Feedback";
 import PassageReference from "./PassageReference";
+import VerseStudy, { type StudyTarget } from "./VerseStudy";
+import { allowsReadingPrefetch } from "../useAdjacentPrefetch";
 
 const Scripture = memo(function Scripture({ reading }: { reading: Day }) {
   return (
@@ -23,9 +34,16 @@ const Scripture = memo(function Scripture({ reading }: { reading: Day }) {
             {passage.verses?.map((verse) => (
               <Fragment key={verse.number}>
                 {verse.heading && <h3>{verse.heading}</h3>}
-                <span className="verse">
-                  <sup aria-label={`آية ${ar(verse.number)}`}>
-                    {ar(verse.number)}
+                <span className="verse" data-v={verse.number}>
+                  <sup>
+                    <button
+                      type="button"
+                      className="verse-number"
+                      aria-haspopup="dialog"
+                      aria-label={`تفاصيل الآية ${ar(verse.number)}`}
+                    >
+                      {ar(verse.number)}
+                    </button>
                   </sup>
                   {verse.text}{" "}
                 </span>
@@ -57,6 +75,69 @@ export default function Reader({
   font,
   complete,
 }: Props) {
+  const [target, setTarget] = useState<StudyTarget | null>(null);
+  const [open, setOpen] = useState(false);
+  const press = useRef<{ t: number; x: number; y: number; selection: boolean }>(
+    null,
+  );
+  const warmed = useRef(false);
+
+  // The sheet stays mounted after its first use, so it can animate; a new day
+  // replaces the verse elements it points to.
+  useEffect(() => {
+    setOpen(false);
+    setTarget(null);
+  }, [reading?.day]);
+
+  function onPointerDown(event: PointerEvent) {
+    press.current = {
+      t: performance.now(),
+      x: event.clientX,
+      y: event.clientY,
+      selection: !(getSelection()?.isCollapsed ?? true),
+    };
+    if (!warmed.current) {
+      warmed.current = true;
+      const connection = (
+        navigator as Navigator & {
+          connection?: Parameters<typeof allowsReadingPrefetch>[0];
+        }
+      ).connection;
+      // Warm the code chunk only; study data loads when a verse opens.
+      if (allowsReadingPrefetch(connection))
+        void import("../study/StudyPanel").catch(() => {});
+    }
+  }
+
+  // A plain tap on a verse opens its study sheet; selecting, long-pressing or
+  // dragging to read does not. Keyboard users activate the verse number.
+  function onClick(event: MouseEvent) {
+    const verseEl = (event.target as Element).closest<HTMLElement>(".verse");
+    if (!verseEl || !reading) return;
+    if (event.detail === 0) {
+      if (!(event.target as Element).closest(".verse-number")) return;
+    } else {
+      const start = press.current;
+      press.current = null;
+      if (
+        !start ||
+        start.selection ||
+        !(getSelection()?.isCollapsed ?? true) ||
+        performance.now() - start.t > 500 ||
+        Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10
+      )
+        return;
+    }
+    const section = verseEl.closest("section.passage");
+    const passage = Number(section?.id.replace("passage-", ""));
+    const verse = Number(verseEl.dataset.v);
+    if (!section || !Number.isInteger(passage) || !Number.isInteger(verse))
+      return;
+    verseEl.dataset.selected = "";
+    setTarget({ passage, verse, el: verseEl });
+    setOpen(true);
+  }
+
   return (
     <div
       className="reading-layout"
@@ -67,6 +148,8 @@ export default function Reader({
         aria-label={`قراءة اليوم ${ar(selected)}`}
         data-day={selected}
         aria-busy={!reading && !error}
+        onPointerDown={onPointerDown}
+        onClick={onClick}
       >
         {error ? (
           <LoadError message={error} retry={retry} />
@@ -76,6 +159,15 @@ export default function Reader({
           <Loading />
         )}
       </article>
+      {target && reading && (
+        <VerseStudy
+          open={open}
+          reading={reading}
+          target={target}
+          onClose={() => setOpen(false)}
+          onAfterClose={() => delete target.el.dataset.selected}
+        />
+      )}
       <div className={`reading-completion ${done ? "is-complete" : ""}`}>
         {done && (
           <p className="completion-state">

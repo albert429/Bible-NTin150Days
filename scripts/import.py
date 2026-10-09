@@ -39,15 +39,30 @@ BOOKS = [
 ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
 
 
+# Van Dyck epistle subscriptions ("\\p -كُتِبَتْ إِلَى …-") are colophons, not verse text.
+SUBSCRIPTION = re.compile(r"^\\p\s+-.*-\s*$")
+
+
+def clean(value: str) -> str:
+    # Remove presentation markers and notes; retain Scripture wording.
+    value = re.sub(r"\\f .*?\\f\*|\\x .*?\\x\*", "", value.strip())
+    value = re.sub(r"\\[a-z0-9]+\*?\s?", "", value).strip()
+    if "\\" in value:
+        raise ValueError(f"Unprocessed USFM marker: {value}")
+    return value
+
+
 def parse_book(text: str) -> dict:
     chapters = {}
     chapter = None
     heading = ""
     pending_heading = False
+    verse = None
     for line in text.splitlines():
         if line.startswith("\\c "):
             chapter = int(line.split()[1])
             chapters[chapter] = {}
+            verse = None
         elif line.startswith("\\s1 "):
             heading = line[4:].strip()
             pending_heading = True
@@ -56,16 +71,17 @@ def parse_book(text: str) -> dict:
             if not match or chapter is None:
                 raise ValueError(f"Invalid USFM verse: {line}")
             number = int(match[1])
-            # Remove presentation markers and notes; retain Scripture wording.
-            value = re.sub(r"\\f .*?\\f\*|\\x .*?\\x\*", "", match[2].strip())
-            value = re.sub(r"\\[a-z0-9]+\*?\s?", "", value).strip()
-            if "\\" in value:
-                raise ValueError(f"Unprocessed USFM marker: {value}")
+            value = clean(match[2])
             verse = {"number": number, "text": value}
             if pending_heading:
                 verse["heading"] = heading
             chapters[chapter][number] = verse
             pending_heading = False
+        elif verse is not None and not SUBSCRIPTION.match(line):
+            # A verse can continue on later paragraph or poetry lines (\p, \q1, …).
+            value = clean(line)
+            if value:
+                verse["text"] = f"{verse['text']} {value}".strip()
     return chapters
 
 

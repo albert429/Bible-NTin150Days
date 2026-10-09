@@ -1,0 +1,38 @@
+import { createJsonClient } from "../jsonClient.ts";
+import type { LexDay, StudyDay, StudyRefs, TrDay } from "./types.ts";
+
+const message = () => "تعذر تحميل دراسة الآية. تحقق من الاتصال وحاول مرة أخرى.";
+const header = (data: unknown, key: string) =>
+  !!data &&
+  typeof data === "object" &&
+  (data as { v?: unknown }).v === 1 &&
+  (data as { day?: unknown }).day === Number(key);
+const isObject = (value: unknown) =>
+  !!value && typeof value === "object" && !Array.isArray(value);
+
+export const studyCore = createJsonClient<StudyDay>({
+  url: (day) => `/study/${day}.json`,
+  validate: (data, key): data is StudyDay =>
+    header(data, key) &&
+    Array.isArray((data as StudyDay).p) &&
+    isObject((data as StudyDay).verses),
+  message,
+});
+export const studyRefs = createJsonClient<StudyRefs>({
+  url: (day) => `/study/${day}.refs.json`,
+  validate: (data, key): data is StudyRefs =>
+    header(data, key) && isObject((data as StudyRefs).refs),
+  message,
+});
+export const studyTr = createJsonClient<TrDay>({
+  url: (day) => `/study/${day}.tr.json`,
+  validate: (data, key): data is TrDay =>
+    header(data, key) && isObject((data as TrDay).verses),
+  message: () => "تعذر تحميل الترجمات. تحقق من الاتصال وحاول مرة أخرى.",
+});
+export const studyLex = createJsonClient<LexDay>({
+  url: (day) => `/study/${day}.lex.json`,
+  validate: (data, key): data is LexDay =>
+    header(data, key) && isObject((data as LexDay).lex),
+  message,
+});

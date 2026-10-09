@@ -47,6 +47,30 @@ export default function About() {
         ، والمصنّفة هناك ضمن الملكية العامة. لا يدّعي هذا التطبيق أي حقوق نشر
         على النص الكتابي.
       </p>
+      <p className="about-rights">
+        دراسة الآيات: الشواهد من{" "}
+        <a
+          href="https://www.openbible.info/labs/cross-references/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          OpenBible.info
+        </a>{" "}
+        (CC BY)، والكلمات اليونانية والقاموس من{" "}
+        <a
+          href="https://github.com/STEPBible/STEPBible-Data"
+          target="_blank"
+          rel="noreferrer"
+        >
+          STEPBible.org
+        </a>{" "}
+        والخدمة العربية للكرازة بالإنجيل (CC BY-SA وCC BY)، والترجمة العربية
+        الجديدة (كتاب الحياة) © Biblica, Inc. (CC BY-SA)، والترجمة الإنجليزية
+        الملك جيمس (KJV، ملكية عامة).{" "}
+        <a href="/licenses/study-data.txt" target="_blank" rel="noreferrer">
+          تفاصيل التراخيص
+        </a>
+      </p>
       <p className="react-credit" lang="en" dir="ltr">
         <ReactIcon />
         <span>Built using React</span>
