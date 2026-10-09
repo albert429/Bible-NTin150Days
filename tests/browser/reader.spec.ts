@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { APP_INFO } from "../../src/appInfo";
 import { closeSheet, key, noOverflow, profile, ready, seed } from "./helpers";
 
 test.use({ reducedMotion: "reduce" });
@@ -72,8 +73,8 @@ test("subtle menu footer opens app credits and restores focus without changing r
       about.getByRole("link", { name: "albertalfred429@gmail.com" }),
     ).toHaveAttribute("href", "mailto:albertalfred429@gmail.com");
     await expect(
-      about.getByRole("link", { name: "albert429", exact: true }),
-    ).toHaveAttribute("href", "https://github.com/albert429");
+      about.getByRole("link", { name: APP_INFO.githubName, exact: true }),
+    ).toHaveAttribute("href", APP_INFO.githubUrl);
     await noOverflow(page);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.keyboard.press("Escape");

@@ -205,16 +205,3 @@
   padding: 16px 8px;
   gap: 12px;
 }
-.study-sources {
-  margin-top: 18px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--muted);
-}
-.study-sources a {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.study-sources a:hover {
-  color: var(--olive);
-}

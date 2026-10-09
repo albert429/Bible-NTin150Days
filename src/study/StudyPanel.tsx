@@ -47,11 +47,6 @@ export default function StudyPanel({
           <GreekWords text={verse.text} g={entry.g} />
         </div>
       )}
-      <p className="study-sources">
-        <a href="/licenses/study-data.txt" target="_blank" rel="noopener">
-          المصادر والتراخيص
-        </a>
-      </p>
     </div>
   );
 }
