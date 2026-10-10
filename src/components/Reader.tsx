@@ -177,11 +177,18 @@ export default function Reader({
                 <button
                   ref={listenButton}
                   className="listen-button"
-                  onClick={() => setListening(selected)}
-                  aria-label="استمع إلى قراءة اليوم"
+                  onClick={() =>
+                    setListening((day) => (day === selected ? null : selected))
+                  }
+                  aria-label={
+                    listening === selected
+                      ? "إيقاف وإغلاق المشغل"
+                      : "استمع إلى قراءة اليوم"
+                  }
                   aria-pressed={listening === selected}
                 >
-                  <Headphones size={16} aria-hidden="true" /> استمع
+                  <Headphones size={16} aria-hidden="true" />
+                  {listening === selected ? "إغلاق المشغل" : "استمع"}
                 </button>
               ) : undefined
             }

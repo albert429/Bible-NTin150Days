@@ -73,40 +73,19 @@
 .audio-progress::-moz-progress-bar {
   background: var(--olive);
 }
-.audio-setting {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.audio-setting select {
-  min-height: 44px;
-  padding: 4px 8px;
-  color: var(--ink);
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
-.audio-setting input {
-  width: 24px;
-  height: 24px;
-  margin: 10px;
-  accent-color: var(--olive);
-}
-.audio-credit {
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.9;
-}
-.audio-credit a {
-  text-decoration: underline;
+.audio-speed {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .verse[data-listening] {
-  background: var(--soft);
+  background: var(--listening-bg);
   border-radius: 4px;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
+}
+.verse[data-listening] .verse-number {
+  color: var(--ink);
 }
 .reading-layout:has(.audio-player) {
   padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px));

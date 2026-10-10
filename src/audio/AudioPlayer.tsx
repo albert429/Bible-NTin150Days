@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Pause, Play, SkipBack, SkipForward, Settings2 } from "lucide-react";
+import { Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import type { Day } from "../readings";
 import { ar } from "../format";
-import Sheet from "../components/Sheet";
 import { audioManifests, resetAudioManifestCache } from "./client";
 import { cueAt, matchesReading, type AudioManifest } from "./manifest";
 import "./audio.css";
@@ -18,7 +17,6 @@ export default function AudioPlayer({
 }) {
   const audio = useRef<HTMLAudioElement>(null);
   const highlighted = useRef<HTMLElement | null>(null);
-  const optionsButton = useRef<HTMLButtonElement>(null);
   const operation = useRef(0);
   const [manifest, setManifest] = useState<AudioManifest>();
   const [attempt, setAttempt] = useState(0);
@@ -28,8 +26,6 @@ export default function AudioPlayer({
   const [ended, setEnded] = useState(false);
   const [time, setTime] = useState(0);
   const [rate, setRate] = useState(1);
-  const [follow, setFollow] = useState(true);
-  const [options, setOptions] = useState(false);
   const index = manifest ? cueAt(manifest.cues, time) : 0;
   const cue = manifest?.cues[index];
   const passage = cue ? reading.passages[cue.passage] : undefined;
@@ -131,35 +127,6 @@ export default function AudioPlayer({
   }, []);
 
   useEffect(() => {
-    const manual = (event: Event) => {
-      if ((event.target as Element)?.closest?.(".audio-player, dialog")) return;
-      setFollow(false);
-    };
-    const keys = (event: KeyboardEvent) => {
-      if (
-        [
-          "ArrowUp",
-          "ArrowDown",
-          "PageUp",
-          "PageDown",
-          "Home",
-          "End",
-          " ",
-        ].includes(event.key)
-      )
-        manual(event);
-    };
-    window.addEventListener("wheel", manual, { passive: true });
-    window.addEventListener("touchmove", manual, { passive: true });
-    window.addEventListener("keydown", keys);
-    return () => {
-      window.removeEventListener("wheel", manual);
-      window.removeEventListener("touchmove", manual);
-      window.removeEventListener("keydown", keys);
-    };
-  }, []);
-
-  useEffect(() => {
     if (highlighted.current) delete highlighted.current.dataset.listening;
     const element = cue
       ? document.querySelector<HTMLElement>(
@@ -169,7 +136,7 @@ export default function AudioPlayer({
     highlighted.current = element;
     if (!element) return;
     element.dataset.listening = "";
-    if (follow && playing) {
+    if (playing) {
       const rect = element.getBoundingClientRect();
       const top =
         (document.querySelector(".topbar")?.getBoundingClientRect().bottom ||
@@ -180,7 +147,7 @@ export default function AudioPlayer({
       if (rect.top < top || rect.bottom > bottom - 24)
         window.scrollBy({ top: rect.top - top, behavior: "instant" });
     }
-  }, [cue, follow, playing]);
+  }, [cue, playing]);
 
   useEffect(() => {
     if (!waiting) return;
@@ -332,13 +299,16 @@ export default function AudioPlayer({
             <SkipBack size={18} aria-hidden="true" />
           </button>
           <button
-            ref={optionsButton}
-            className="icon-button"
-            aria-label="إعدادات الصوت"
-            aria-haspopup="dialog"
-            onClick={() => setOptions(true)}
+            className="icon-button audio-speed"
+            aria-label={`سرعة القراءة: ${rate}×`}
+            title="تغيير سرعة القراءة"
+            dir="ltr"
+            onClick={() => {
+              const speeds = [0.75, 1, 1.25, 1.5];
+              setRate(speeds[(speeds.indexOf(rate) + 1) % speeds.length]);
+            }}
           >
-            <Settings2 size={19} aria-hidden="true" />
+            {rate}×
           </button>
         </div>
         {(error || !manifest || waiting) && (
@@ -372,54 +342,6 @@ export default function AudioPlayer({
           aria-label="تقدم التسجيل"
         />
       </section>
-      <Sheet
-        open={options}
-        title="إعدادات الصوت"
-        returnFocusTo={optionsButton.current}
-        onClose={() => setOptions(false)}
-      >
-        <label className="audio-setting">
-          سرعة القراءة
-          <select
-            value={rate}
-            onChange={(e) => setRate(Number(e.target.value))}
-            aria-label="سرعة القراءة"
-            dir="ltr"
-          >
-            {[0.75, 1, 1.25, 1.5].map((speed) => (
-              <option key={speed} value={speed}>
-                {speed}×
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="audio-setting">
-          متابعة الآية أثناء الاستماع
-          <input
-            type="checkbox"
-            checked={follow}
-            onChange={(e) => setFollow(e.target.checked)}
-          />
-        </label>
-        <p className="audio-credit">
-          القراءة الدرامية · ترجمة فان دايك
-          <br />
-          توقيت تظليل الآيات تقريبي.
-          <br />© 1996 جمعية الكتاب المقدس بمصر · ℗ 2008 Hosanna / Faith Comes
-          By Hearing
-          <br />
-          <a
-            href="https://www.faithcomesbyhearing.com/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            مصدر التسجيل
-          </a>
-        </p>
-        <button className="quiet-button" onClick={onClose}>
-          إيقاف وإغلاق المشغل
-        </button>
-      </Sheet>
     </>
   );
 }

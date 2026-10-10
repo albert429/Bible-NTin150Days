@@ -63,6 +63,21 @@ export default function About() {
           تفاصيل التراخيص
         </a>
       </p>
+      <p className="about-rights">
+        القراءة الدرامية · ترجمة فان دايك
+        <br />
+        توقيت تظليل الآيات تقريبي.
+        <br />© 1996 جمعية الكتاب المقدس بمصر · ℗ 2008 Hosanna / Faith Comes By
+        Hearing
+        <br />
+        <a
+          href="https://www.faithcomesbyhearing.com/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          مصدر التسجيل
+        </a>
+      </p>
       <p className="react-credit" lang="en" dir="ltr">
         <ReactIcon />
         <span>Built using React</span>

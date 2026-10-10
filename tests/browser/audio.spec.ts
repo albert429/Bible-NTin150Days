@@ -126,10 +126,15 @@ test("audio loads only after listening, streams, and stops on day navigation", a
   await expect(page.getByRole("article")).toHaveAttribute("data-day", "2");
 });
 
-test("options, keyboard focus, study pause, motion and mobile reflow", async ({
+test("direct speed, close, study pause and highlights remain accessible on phones", async ({
   page,
 }) => {
   await openPlayer(page);
+  await expect
+    .poll(() =>
+      page.locator("audio").evaluate((el: HTMLAudioElement) => el.currentTime),
+    )
+    .toBeGreaterThan(0);
   for (const width of [320, 360, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
     await noOverflow(page);
@@ -140,34 +145,31 @@ test("options, keyboard focus, study pause, motion and mobile reflow", async ({
       );
     expect(targets.every((height) => height >= 44)).toBe(true);
   }
-  await page
-    .getByRole("button", { name: "إعدادات الصوت", exact: true })
-    .click();
-  await expect
-    .poll(() =>
-      page.locator("audio").evaluate((el: HTMLAudioElement) => el.paused),
-    )
-    .toBe(true);
-  const options = page.getByRole("dialog", {
-    name: "إعدادات الصوت",
-    exact: true,
-  });
-  await options
-    .getByRole("combobox", { name: "سرعة القراءة" })
-    .selectOption("1.5");
-  await expect
-    .poll(() =>
-      page.locator("audio").evaluate((el: HTMLAudioElement) => el.playbackRate),
-    )
-    .toBe(1.5);
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  await page.keyboard.press("Escape");
   await expect(
     page.getByRole("button", { name: "إعدادات الصوت", exact: true }),
-  ).toBeFocused();
-  await page
-    .getByRole("button", { name: "تشغيل التسجيل", exact: true })
-    .click();
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("checkbox", { name: "متابعة الآية أثناء الاستماع" }),
+  ).toHaveCount(0);
+  const speed = page.getByRole("button", { name: /^سرعة القراءة:/ });
+  await speed.focus();
+  for (const rate of [1.25, 1.5, 0.75, 1]) {
+    await page.keyboard.press("Enter");
+    await expect(speed).toHaveText(`${rate}×`);
+    await expect
+      .poll(() =>
+        page
+          .locator("audio")
+          .evaluate((el: HTMLAudioElement) => el.playbackRate),
+      )
+      .toBe(rate);
+    await expect
+      .poll(() =>
+        page.locator("audio").evaluate((el: HTMLAudioElement) => el.paused),
+      )
+      .toBe(false);
+  }
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
   await page.locator(".verse-number").first().focus();
   await page.keyboard.press("Enter");
   await expect
@@ -176,18 +178,32 @@ test("options, keyboard focus, study pause, motion and mobile reflow", async ({
     )
     .toBe(true);
   await closeSheet(page);
+  for (const theme of ["الوضع النهاري", "الوضع الليلي"]) {
+    await page
+      .getByRole("button", { name: "إعدادات القراءة", exact: true })
+      .click();
+    await page.getByRole("button", { name: theme, exact: true }).click();
+    await closeSheet(page);
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    const highlight = await page
+      .locator("[data-listening]")
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(highlight).toBe(
+      theme === "الوضع النهاري" ? "rgb(240, 217, 130)" : "rgb(103, 87, 43)",
+    );
+  }
   await page.setViewportSize({ width: 195, height: 422 });
   await noOverflow(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page
-    .getByRole("button", { name: "إعدادات الصوت", exact: true })
-    .click();
-  await options.getByRole("button", { name: "إيقاف وإغلاق المشغل" }).click();
+    .getByRole("button", { name: "إيقاف وإغلاق المشغل", exact: true })
+    .focus();
+  await page.keyboard.press("Enter");
   await expect(
     page.getByRole("button", { name: "استمع إلى قراءة اليوم" }),
   ).toBeFocused();
   await expect(page.locator("audio")).toHaveCount(0);
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await expect(page.locator("[data-listening]")).toHaveCount(0);
 });
 
 test("failed manifests retry; stale transcripts never play", async ({
@@ -224,18 +240,33 @@ test("failed manifests retry; stale transcripts never play", async ({
   await expect(page.locator("audio")).toHaveAttribute("src", /\.m4a$/);
 });
 
-test("manual scrolling suspends following and late data cannot restart another day", async ({
+test("text tracking stays on after manual scrolling and late data cannot restart another day", async ({
   page,
 }) => {
   await openPlayer(page);
+  await expect
+    .poll(() =>
+      page.locator("audio").evaluate((el: HTMLAudioElement) => el.currentTime),
+    )
+    .toBeGreaterThan(0);
   await page.locator(".scripture").dispatchEvent("wheel", { deltaY: 300 });
-  await page
-    .getByRole("button", { name: "إعدادات الصوت", exact: true })
-    .click();
-  await expect(
-    page.getByRole("checkbox", { name: "متابعة الآية أثناء الاستماع" }),
-  ).not.toBeChecked();
-  await closeSheet(page);
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  const manifest = JSON.parse(
+    readFileSync("data/audio/manifests/1.json", "utf8"),
+  );
+  const nextTime =
+    process.env.AUDIO_TEST_FIXTURES === "1" ? 20.1 : manifest.cues[20].start;
+  await page.locator("audio").evaluate((el: HTMLAudioElement, time) => {
+    el.currentTime = time;
+  }, nextTime);
+  await expect
+    .poll(() =>
+      page.locator("[data-listening]").evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        return rect.top >= 60 && rect.top < innerHeight - 80;
+      }),
+    )
+    .toBe(true);
   await page.reload();
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {

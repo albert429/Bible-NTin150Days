@@ -122,8 +122,11 @@ verify that all referenced files are uploaded before setting the variable.
 
 ## Playback behavior and verification
 
-The bottom player supports play/pause, previous/next verse, speed, follow mode,
-and close. Manual scrolling suspends following. Opening any dialog pauses audio;
+The bottom player supports play/pause, previous/next verse, and a direct speed
+button cycling through 0.75×, 1×, 1.25×, and 1.5×. Text tracking stays on during
+playback, including after manual scrolling; it follows again on the next verse.
+The Listen button changes to Close player while active. Recording credits live
+in About. Opening any dialog pauses audio;
 closing a dialog does not resume it automatically. Changing day, reader, or main
 view stops playback. Listening never completes a day or advances to another day.
 

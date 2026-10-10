@@ -69,6 +69,10 @@ test("subtle menu footer opens app credits and restores focus without changing r
     });
     await expect(about).toContainText("شباب كنيسة الإخوة بخلوصي");
     await expect(about).toContainText("لا يدّعي هذا التطبيق أي حقوق نشر");
+    await expect(about).toContainText("توقيت تظليل الآيات تقريبي");
+    await expect(
+      about.getByRole("link", { name: "مصدر التسجيل" }),
+    ).toHaveAttribute("href", "https://www.faithcomesbyhearing.com/");
     await expect(
       about.getByRole("link", { name: "albertalfred429@gmail.com" }),
     ).toHaveAttribute("href", "mailto:albertalfred429@gmail.com");
