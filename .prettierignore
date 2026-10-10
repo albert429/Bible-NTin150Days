@@ -9,3 +9,4 @@ package-lock.json
 data/books.json
 data/study/
 public/study/
+dist-ai/
