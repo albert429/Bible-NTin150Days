@@ -3,18 +3,19 @@ import type { GreekToken, LexDay, VerseText } from "../study/types.ts";
 import { gloss, greekWord, keyGroups, span } from "../study/verse.ts";
 import type { AiRequest, ChipId } from "./types.ts";
 
-/** Bump when the prompt, chips or models change: cached answers are dropped. */
-export const PROMPT_VERSION = 1;
-export const MAX_OUTPUT_TOKENS = 2000;
-export const QUESTION_MIN = 3;
-export const QUESTION_MAX = 200;
-export const OFF_TOPIC = "هذا السؤال خارج موضوع الآية، جرّب سؤالًا عنها.";
+import { QUESTION_MAX, cleanQuestion } from "./chips.ts";
 
-export const CHIPS: readonly { id: Exclude<ChipId, "ask">; label: string }[] = [
-  { id: "explain", label: "اشرح الآية" },
-  { id: "words", label: "معاني الكلمات" },
-  { id: "background", label: "الخلفية والسياق" },
-];
+// The chip list and question limits live in chips.ts so the card's chunk does
+// not carry this prompt text; they are re-exported for convenience.
+export {
+  CHIPS,
+  cleanQuestion,
+  PROMPT_VERSION,
+  QUESTION_MAX,
+  QUESTION_MIN,
+} from "./chips.ts";
+export const MAX_OUTPUT_TOKENS = 2000;
+export const OFF_TOPIC = "هذا السؤال خارج موضوع الآية، جرّب سؤالًا عنها.";
 
 const TASKS: Record<Exclude<ChipId, "ask">, string> = {
   explain:
@@ -70,14 +71,6 @@ export function cleanDefinition(definition: string) {
     .replace(/\(\s*[,;]?\s*\)/g, "")
     .replace(/\s+([,;:.])/g, "$1")
     .replace(/([,;])(?:\s*[,;])+/g, "$1")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/** A reader's question as plain text: no control or bidi characters. */
-export function cleanQuestion(raw: string) {
-  return raw
-    .replace(/[\u0000-\u001f\u007f-\u009f‪-‮⁦-⁩]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
