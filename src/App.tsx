@@ -10,7 +10,7 @@ import {
   PROGRESS_KEY,
   type Reader as Profile,
 } from "./progress";
-import { ar, today, dayIndex, dateFor, scheduledDay } from "./format";
+import { today, dayIndex, dateFor, scheduledDay } from "./format";
 import Reader from "./components/Reader";
 import Navigation, { type View } from "./components/Navigation";
 import { ChunkBoundary, Loading } from "./components/Feedback";
@@ -19,7 +19,7 @@ import { useReading } from "./useReading";
 import { useAdjacentPrefetch } from "./useAdjacentPrefetch";
 import type { Day } from "./readings";
 import { useAppearance } from "./useAppearance";
-const Share = lazy(() => import("./components/Share"));
+import { appShareData } from "./share";
 const Calendar = lazy(() => import("./components/Calendar"));
 const Dialogs = lazy(() => import("./components/Dialogs"));
 
@@ -175,18 +175,10 @@ export default function App() {
       setBusy(false);
     }
   }
-  function showLink(kind: "invite" | "checkin") {
-    if (kind === "checkin" && !member) {
-      openModal("join");
-      return;
-    }
-    const url = location.origin + location.pathname;
-    setLinkText(
-      kind === "checkin"
-        ? `${member!.name}: تمت قراءة اليوم ${ar(selected)} ✓\n${url}`
-        : url,
-    );
-    openModal(kind);
+  function showLink() {
+    const data = appShareData();
+    setLinkText(`${data.text}\n${data.url}`);
+    openModal("invite");
   }
   async function copy() {
     try {
@@ -250,8 +242,7 @@ export default function App() {
         navigate={navigate}
         member={member}
         settings={() => openModal(member ? "settings" : "join")}
-        backup={backup}
-        restore={() => importInput.current?.click()}
+        shareFallback={showLink}
         dark={dark}
         setDark={setDark}
         font={font}
@@ -300,16 +291,8 @@ export default function App() {
             <section className="page-heading">
               <div>
                 <span className="eyebrow">١٥٠ يومًا · بالترتيب الزمني</span>
-                <h1>
-                  {view === "calendar"
-                    ? "رحلتك، يومًا بيوم"
-                    : "شارك خطوة من رحلتك"}
-                </h1>
-                <p>
-                  {view === "calendar"
-                    ? "تابع الأيام المكتملة، وعُد إلى أي قراءة."
-                    : "شارك رابط القراءة أو أرسل إتمامك إلى مجموعتك."}
-                </p>
+                <h1>رحلتك، يومًا بيوم</h1>
+                <p>تابع الأيام المكتملة، وعُد إلى أي قراءة.</p>
               </div>
               {!member ? (
                 <button className="primary" onClick={() => openModal("join")}>
@@ -326,26 +309,18 @@ export default function App() {
                 </button>
               )}
             </section>
-            {view === "calendar" ? (
-              <ChunkBoundary>
-                <Suspense fallback={<Loading label="جارٍ فتح خطة القراءة…" />}>
-                  <Calendar
-                    member={member}
-                    start={start}
-                    current={current}
-                    page={page}
-                    setPage={setPage}
-                    go={go}
-                  />
-                </Suspense>
-              </ChunkBoundary>
-            ) : (
-              <ChunkBoundary>
-                <Suspense fallback={<Loading label="جارٍ فتح المشاركة…" />}>
-                  <Share done={done} selected={selected} showLink={showLink} />
-                </Suspense>
-              </ChunkBoundary>
-            )}
+            <ChunkBoundary>
+              <Suspense fallback={<Loading label="جارٍ فتح خطة القراءة…" />}>
+                <Calendar
+                  member={member}
+                  start={start}
+                  current={current}
+                  page={page}
+                  setPage={setPage}
+                  go={go}
+                />
+              </Suspense>
+            </ChunkBoundary>
           </>
         )}
       </main>
@@ -390,7 +365,6 @@ export default function App() {
                   chooseReader={chooseReader}
                   backup={backup}
                   restore={() => importInput.current?.click()}
-                  showLink={showLink}
                   copy={copy}
                 />
               </Suspense>

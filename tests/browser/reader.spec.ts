@@ -194,6 +194,7 @@ test("completion, undo, backup, restore, and reader switching preserve profiles"
     page.getByRole("button", { name: "تمت القراءة", exact: true }),
   ).toBeVisible();
   await menu(page, "إعدادات رحلتي");
+  await page.getByText("النسخ الاحتياطي والاستعادة", { exact: true }).click();
   const downloadPromise = page.waitForEvent("download");
   await page
     .getByRole("button", { name: "تنزيل نسخة احتياطية", exact: true })
@@ -251,41 +252,139 @@ test("new readers can join; failed storage does not claim a successful save", as
     ),
   ).toEqual([]);
 });
-test("dialogs support Escape and return focus; sharing preserves Arabic and URL direction", async ({
+test("compact menu keeps progress with the plan and backups in reader settings", async ({
   page,
 }) => {
   await seed(page);
   await page.goto("/");
   await ready(page);
-  const toggle = page.getByRole("button", { name: "فتح القائمة", exact: true });
-  await toggle.click();
-  await page.keyboard.press("Escape");
-  await expect(toggle).toBeFocused();
+  for (const width of [320, 360, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page
+      .getByRole("button", { name: "فتح القائمة", exact: true })
+      .click();
+    const menuDialog = page.getByRole("dialog", {
+      name: "القائمة",
+      exact: true,
+    });
+    await expect(
+      menuDialog.getByRole("navigation").getByRole("button"),
+    ).toHaveCount(2);
+    await expect(
+      menuDialog.getByRole("button", {
+        name: "رحلتي في ١٥٠ يومًا",
+        exact: true,
+      }),
+    ).toContainText("٢ من ١٥٠ يومًا مكتملًا");
+    await expect(
+      menuDialog.getByRole("button", { name: /نسخة احتياطية/ }),
+    ).toHaveCount(0);
+    const share = await menuDialog
+      .getByRole("button", { name: "مشاركة التطبيق" })
+      .boundingBox();
+    const close = await menuDialog
+      .getByRole("button", { name: "إغلاق النافذة" })
+      .boundingBox();
+    expect(share!.y).toBe(close!.y);
+    expect(share!.height).toBeGreaterThanOrEqual(44);
+    await noOverflow(page);
+    if (width === 390) {
+      expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+      await page.screenshot({
+        path: test.info().outputPath("menu-minimal.png"),
+        scale: "css",
+      });
+    }
+    await closeSheet(page);
+  }
   await menu(page, "إعدادات رحلتي");
   await expect(
-    page.getByRole("heading", { name: "رحلتك يا ميخائيل" }),
+    page.getByRole("button", { name: "تنزيل نسخة احتياطية", exact: true }),
+  ).not.toBeVisible();
+  await page.getByText("النسخ الاحتياطي والاستعادة", { exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "تنزيل نسخة احتياطية", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(toggle).toBeFocused();
-  await page.getByRole("button", { name: "تمت القراءة", exact: true }).click();
-  await menu(page, "مشاركة القراءة");
-  await page
-    .getByRole("button", { name: "مشاركة إتمام اليوم ١٠", exact: true })
-    .click();
   await expect(
-    page.getByRole("textbox", { name: "نص المشاركة" }),
-  ).toHaveAttribute("dir", "auto");
-  await expect(page.getByRole("textbox", { name: "نص المشاركة" })).toHaveValue(
-    /ميخائيل.*\nhttp/,
-  );
-  await page.keyboard.press("Escape");
-  await page
-    .getByRole("button", { name: "مشاركة رابط الموقع", exact: true })
-    .click();
-  await expect(
-    page.getByRole("textbox", { name: "نص المشاركة" }),
-  ).toHaveAttribute("dir", "ltr");
+    page.getByRole("button", { name: "فتح القائمة", exact: true }),
+  ).toBeFocused();
 });
+
+test("share fallback contains a generic Arabic description and restores focus", async ({
+  page,
+}) => {
+  await seed(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "share", {
+      value: undefined,
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: async (text: string) => {
+          document.documentElement.dataset.copied = text;
+        },
+      },
+      configurable: true,
+    });
+  });
+  await page.goto("/");
+  await ready(page);
+  await menu(page, "مشاركة التطبيق");
+  const field = page.getByRole("textbox", { name: "نص المشاركة" });
+  await expect(field).toHaveAttribute("dir", "auto");
+  await expect(field).toHaveValue(/بالترتيب الزمني.*كتاب صوتي.*\nhttp/);
+  expect(await field.inputValue()).not.toContain(profile.name);
+  await page.getByRole("button", { name: "نسخ", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-copied",
+    await field.inputValue(),
+  );
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "فتح القائمة", exact: true }),
+  ).toBeFocused();
+});
+
+for (const outcome of ["success", "cancel", "error"] as const) {
+  test(`native sharing: ${outcome}`, async ({ page }) => {
+    await page.addInitScript((outcome) => {
+      Object.defineProperty(navigator, "share", {
+        configurable: true,
+        value: async (data: ShareData) => {
+          document.documentElement.dataset.shared = JSON.stringify(data);
+          if (outcome !== "success")
+            throw new DOMException(
+              "Test share result",
+              outcome === "cancel" ? "AbortError" : "NotAllowedError",
+            );
+        },
+      });
+    }, outcome);
+    await page.goto("/");
+    await ready(page);
+    await menu(page, "مشاركة التطبيق");
+    const payload = JSON.parse(
+      (await page.locator("html").getAttribute("data-shared"))!,
+    );
+    expect(payload.title).toBe(APP_INFO.title);
+    expect(payload.text).toContain("كتاب صوتي");
+    expect(payload.url).toMatch(/^http/);
+    await expect(
+      page.getByRole("textbox", { name: "نص المشاركة" }),
+    ).toHaveCount(outcome === "error" ? 1 : 0);
+    if (outcome !== "error") {
+      await expect(
+        page.getByRole("dialog", { name: "القائمة", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "مشاركة التطبيق", exact: true }),
+      ).toBeEnabled();
+    }
+  });
+}
 test("the first verse begins within 200px and the toolbar stays a single accessible row", async ({
   page,
 }) => {
@@ -690,7 +789,9 @@ test("sheet content survives exit, releases after closing, and rapid reopen stay
   const dialog = page.getByRole("dialog", { name: "القائمة", exact: true });
   await expect(dialog.locator(".menu-brand")).toBeVisible();
   await dialog.evaluate((element) =>
-    element.querySelector<HTMLButtonElement>(".sheet-header button")!.click(),
+    element
+      .querySelector<HTMLButtonElement>('[aria-label="إغلاق النافذة"]')!
+      .click(),
   );
   await expect(dialog).toHaveAttribute("data-closing", "true");
   await expect(page.locator(".menu-brand")).toHaveCount(1);

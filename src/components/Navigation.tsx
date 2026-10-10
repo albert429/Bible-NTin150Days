@@ -5,9 +5,11 @@ import {
   ChevronRight,
   ChevronDown,
   Settings,
+  Share2,
 } from "lucide-react";
 import type { Reader } from "../progress";
 import type { Day } from "../readings";
+import { appShareData } from "../share";
 import { ar } from "../format";
 import { ChunkBoundary, Loading } from "./Feedback";
 import Sheet from "./Sheet";
@@ -17,15 +19,14 @@ import AppearancePanel from "./navigation/AppearancePanel";
 import logo from "../assets/favicon.svg";
 const About = lazy(() => import("./About"));
 
-export type View = "read" | "calendar" | "share";
+export type View = "read" | "calendar";
 type Panel = "menu" | "day" | "appearance" | "about";
 type Props = {
   view: View;
   navigate: (view: View) => void;
   member: Reader | null;
   settings: () => void;
-  backup: () => void;
-  restore: () => void;
+  shareFallback: () => void;
   dark: boolean;
   setDark: (dark: boolean) => void;
   font: number;
@@ -44,8 +45,7 @@ export default function Navigation({
   navigate,
   member,
   settings,
-  backup,
-  restore,
+  shareFallback,
   dark,
   setDark,
   font,
@@ -61,6 +61,7 @@ export default function Navigation({
 }: Props) {
   const [panel, setPanel] = useState<Panel>("menu");
   const [open, setOpen] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const afterClose = useRef<(() => void) | null>(null);
   const sheetTrigger = useRef<HTMLElement | null>(null);
   function show(next: Panel, trigger: HTMLElement) {
@@ -73,6 +74,21 @@ export default function Navigation({
     if (!open) return;
     afterClose.current = action || null;
     setOpen(false);
+  }
+  async function share() {
+    if (sharing) return;
+    if (navigator.share) {
+      setSharing(true);
+      try {
+        await navigator.share(appShareData());
+        return;
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
+      } finally {
+        setSharing(false);
+      }
+    }
+    close(shareFallback);
   }
   function jump(index: number) {
     close(() => {
@@ -130,9 +146,7 @@ export default function Navigation({
               </button>
             </>
           ) : (
-            <div className="toolbar-title">
-              {view === "calendar" ? "خطة القراءة" : "مشاركة القراءة"}
-            </div>
+            <div className="toolbar-title">خطة القراءة</div>
           )}
           <button
             className="icon-button appearance-toggle"
@@ -157,6 +171,19 @@ export default function Navigation({
                 ? "About the app"
                 : "إعدادات القراءة"
         }
+        headerActions={
+          panel === "menu" ? (
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="مشاركة التطبيق"
+              disabled={sharing}
+              onClick={share}
+            >
+              <Share2 size={20} aria-hidden="true" />
+            </button>
+          ) : undefined
+        }
         onClose={() => close()}
         onAfterClose={() => {
           const action = afterClose.current;
@@ -170,8 +197,6 @@ export default function Navigation({
             navigate={navigate}
             member={member}
             settings={settings}
-            backup={backup}
-            restore={restore}
             close={close}
             about={() => {
               const trigger = sheetTrigger.current;

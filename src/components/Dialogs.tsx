@@ -11,7 +11,7 @@ import type { FormEvent } from "react";
 import { ar, dateLabel } from "../format";
 import type { Reader } from "../progress";
 
-export type Modal = "join" | "settings" | "invite" | "checkin";
+export type Modal = "join" | "settings" | "invite";
 type Props = {
   modal: Modal;
   member: Reader | null;
@@ -25,7 +25,6 @@ type Props = {
   chooseReader: (id: string | null) => void;
   backup: () => void;
   restore: () => void;
-  showLink: (kind: "invite" | "checkin") => void;
   copy: () => void;
 };
 export default function Dialogs({
@@ -41,7 +40,6 @@ export default function Dialogs({
   chooseReader,
   backup,
   restore,
-  showLink,
   copy,
 }: Props) {
   return (
@@ -129,22 +127,21 @@ export default function Dialogs({
           <p className="dialog-description">
             بدأت في {dateLabel(start)}. تقدمك محفوظ في هذا المتصفح فقط.
           </p>
-          <button className="setting-row" onClick={backup}>
-            <Download size={20} />
-            تنزيل نسخة احتياطية
-          </button>
-          <button className="setting-row" onClick={restore}>
-            <Upload size={20} />
-            استعادة نسخة احتياطية
-          </button>
-          <button className="setting-row" onClick={() => showLink("invite")}>
-            <Link size={20} />
-            مشاركة رابط الموقع
-          </button>
-          <p className="privacy-note">
-            النسخة الاحتياطية تحتوي اسمك وتاريخ البداية والأيام المكتملة. احتفظ
-            بها لنفسك. لا توجد مزامنة تلقائية بين الأجهزة.
-          </p>
+          <details className="profile-backup">
+            <summary>النسخ الاحتياطي والاستعادة</summary>
+            <button className="setting-row" onClick={backup}>
+              <Download size={18} aria-hidden="true" />
+              تنزيل نسخة احتياطية
+            </button>
+            <button className="setting-row" onClick={restore}>
+              <Upload size={18} aria-hidden="true" />
+              استعادة نسخة احتياطية
+            </button>
+            <p className="privacy-note">
+              النسخة الاحتياطية تحتوي اسمك وتاريخ البداية والأيام المكتملة.
+              احتفظ بها لنفسك. لا توجد مزامنة تلقائية بين الأجهزة.
+            </p>
+          </details>
           <button className="setting-row" onClick={() => chooseReader(null)}>
             <Users size={20} />
             تغيير القارئ على هذا الجهاز
@@ -152,21 +149,15 @@ export default function Dialogs({
         </>
       ) : (
         <>
-          <h2 id="dialog-title">
-            {modal === "checkin"
-              ? "مشاركة إتمام القراءة"
-              : "مشاركة رابط الموقع"}
-          </h2>
+          <h2 id="dialog-title">مشاركة التطبيق</h2>
           <p className="dialog-description">
-            {modal === "checkin"
-              ? "انسخ النص وأرسله إلى مجموعتك، أو افتح واتساب لاختيار المستلمين."
-              : "يبدأ كل قارئ رحلته الخاصة. هذا الرابط لا يشارك اسمك أو تقدمك."}
+            شارك التطبيق مع أصدقائك. لا يتضمن النص اسمك أو تقدمك.
           </p>
           <textarea
             className="link-field"
             aria-label="نص المشاركة"
-            dir={modal === "checkin" ? "auto" : "ltr"}
-            rows={3}
+            dir="auto"
+            rows={5}
             readOnly
             value={linkText}
             onFocus={(event) => event.target.select()}
@@ -175,17 +166,6 @@ export default function Dialogs({
             <Copy size={18} />
             نسخ
           </button>
-          {modal === "checkin" && (
-            <a
-              className="quiet-button full whatsapp-link"
-              href={`https://wa.me/?text=${encodeURIComponent(linkText)}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              فتح واتساب
-              <ArrowLeft size={18} />
-            </a>
-          )}
         </>
       )}
     </>

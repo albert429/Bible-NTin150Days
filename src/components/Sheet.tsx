@@ -13,6 +13,7 @@ type Props = {
   onClose: () => void;
   onAfterClose?: () => void;
   returnFocusTo?: HTMLElement | null;
+  headerActions?: ReactNode;
   children: ReactNode;
 };
 
@@ -24,6 +25,7 @@ export default function Sheet({
   onAfterClose,
   returnFocusTo,
   children,
+  headerActions,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const surface = useRef<HTMLDivElement>(null);
@@ -178,15 +180,18 @@ export default function Sheet({
           <>
             <div className="sheet-header">
               <h2 id={titleId}>{title}</h2>
-              <button
-                type="button"
-                className="icon-button"
-                aria-label="إغلاق النافذة"
-                onClick={requestClose}
-                autoFocus
-              >
-                <X size={22} aria-hidden="true" />
-              </button>
+              <div className="sheet-header-actions">
+                {headerActions}
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label="إغلاق النافذة"
+                  onClick={requestClose}
+                  autoFocus
+                >
+                  <X size={22} aria-hidden="true" />
+                </button>
+              </div>
             </div>
             <div className="sheet-body">{children}</div>
           </>

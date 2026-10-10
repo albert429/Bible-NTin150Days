@@ -1,11 +1,8 @@
 import {
   BookOpen,
   CalendarDays,
-  Users,
   ChevronLeft,
   Settings,
-  Download,
-  Upload,
   Info,
 } from "lucide-react";
 import type { Reader } from "../../progress";
@@ -21,15 +18,12 @@ const links = [
     label: "رحلتي في ١٥٠ يومًا",
     icon: CalendarDays,
   },
-  { view: "share" as const, label: "مشاركة القراءة", icon: Users },
 ];
 type Props = {
   view: View;
   navigate: (view: View) => void;
   member: Reader | null;
   settings: () => void;
-  backup: () => void;
-  restore: () => void;
   about: () => void;
   close: (action?: () => void) => void;
 };
@@ -38,8 +32,6 @@ export default function MenuPanel({
   navigate,
   member,
   settings,
-  backup,
-  restore,
   about,
   close,
 }: Props) {
@@ -55,31 +47,21 @@ export default function MenuPanel({
           <button
             className="nav-item"
             key={target}
+            aria-label={label}
             aria-current={view === target ? "page" : undefined}
             onClick={() => close(() => navigate(target))}
           >
             <Icon size={20} aria-hidden="true" />
-            {label}
+            <span className="menu-link-label">
+              {label}
+              {target === "calendar" && member && (
+                <small>{ar(count)} من ١٥٠ يومًا مكتملًا</small>
+              )}
+            </span>
             <ChevronLeft size={16} aria-hidden="true" />
           </button>
         ))}
       </nav>
-      <div className="journey-summary">
-        <p className="progress-number">
-          {ar(count)}
-          <span> / ١٥٠ يومًا مكتملًا</span>
-        </p>
-        <div
-          className="progress-track"
-          role="progressbar"
-          aria-label="تقدم القراءة"
-          aria-valuenow={count}
-          aria-valuemin={0}
-          aria-valuemax={150}
-        >
-          <i style={{ width: `${(count / 150) * 100}%` }} />
-        </div>
-      </div>
       <button
         className="profile"
         onClick={() => close(settings)}
@@ -96,20 +78,6 @@ export default function MenuPanel({
         </span>
         <Settings size={19} aria-hidden="true" />
       </button>
-      <div className="menu-links">
-        <button
-          className="nav-item"
-          disabled={!member}
-          onClick={() => close(backup)}
-        >
-          <Download size={20} aria-hidden="true" />
-          تنزيل نسخة احتياطية
-        </button>
-        <button className="nav-item" onClick={() => close(restore)}>
-          <Upload size={20} aria-hidden="true" />
-          استعادة نسخة احتياطية
-        </button>
-      </div>
       <footer className="menu-footer">
         <div className="menu-source">
           <p>النص: ترجمة فان دايك · ملكية عامة</p>
