@@ -5,6 +5,11 @@ export const verseId = (usfm: string, chapter: number, verse: number) =>
 
 export const tokens = (text: string) => text.split(" ");
 
+/** A Greek token without trailing punctuation ("λόγος," → "λόγος"). */
+export const greekWord = (word: string) => word.replace(/[,.;·:]+$/, "");
+/** An English gloss without a trailing full stop. */
+export const gloss = (value: string) => value.replace(/\.$/, "");
+
 /** The Van Dyck words a0..a1, without trailing punctuation or quote marks. */
 export function span(text: string, a0: number, a1: number) {
   return tokens(text)

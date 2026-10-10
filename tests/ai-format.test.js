@@ -1,0 +1,71 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { cleanAnswer, modelLabel, parseAnswer } from "../src/ai/format.ts";
+
+const texts = (blocks) => JSON.stringify(blocks);
+
+test("HTML-looking output stays literal text in the AST", () => {
+  const blocks = parseAnswer(
+    cleanAnswer("<img src=x onerror=alert(1)> <script>alert(1)</script>"),
+  );
+  assert.deepEqual(blocks, [
+    {
+      kind: "p",
+      inlines: [
+        { text: "<img src=x onerror=alert(1)> <script>alert(1)</script>" },
+      ],
+    },
+  ]);
+});
+
+test("Links keep only their text; images and code fences are removed", () => {
+  const text = cleanAnswer(
+    "انظر [هنا](javascript:alert(1)) ![صورة](https://t.example/p.png)\n```js\nx\n```",
+  );
+  assert.equal(text, "انظر هنا \n\nx");
+  assert.doesNotMatch(text, /javascript|https/);
+});
+
+test("Bidi overrides, control characters and hidden reasoning are stripped", () => {
+  assert.equal(cleanAnswer("a‮b⁦c\u0007d‍e‏f"), "abcd‍e‏f");
+  assert.equal(cleanAnswer("<think>تفكير</think>الجواب"), "الجواب");
+  assert.equal(cleanAnswer("الجواب<THINK>ما زال"), "الجواب");
+  assert.equal(cleanAnswer("<think>only reasoning"), "");
+});
+
+test("Paragraphs, lists, headings and bold become blocks", () => {
+  const blocks = parseAnswer(
+    "# العنوان\nفقرة **مهمة** هنا\n\n- أولًا\n• ثانيًا\n١. واحد\n2) اثنان\n---\n> اقتباس **غير مغلق",
+  );
+  assert.deepEqual(blocks, [
+    { kind: "p", inlines: [{ text: "العنوان", bold: true }] },
+    {
+      kind: "p",
+      inlines: [
+        { text: "فقرة " },
+        { text: "مهمة", bold: true },
+        { text: " هنا" },
+      ],
+    },
+    { kind: "ul", items: [[{ text: "أولًا" }], [{ text: "ثانيًا" }]] },
+    { kind: "ol", items: [[{ text: "واحد" }], [{ text: "اثنان" }]] },
+    { kind: "p", inlines: [{ text: "اقتباس **غير مغلق" }] },
+  ]);
+});
+
+test("Pathological input parses quickly (no catastrophic backtracking)", () => {
+  const nasty = "*".repeat(50000) + "[".repeat(50000) + "](" + "a".repeat(1000);
+  const started = Date.now();
+  parseAnswer(cleanAnswer(nasty));
+  assert.ok(Date.now() - started < 200, texts(Date.now() - started));
+});
+
+test("Model names are sanitised for the footer", () => {
+  assert.equal(
+    modelLabel("google/gemma-4-31b-it:free"),
+    "google/gemma-4-31b-it",
+  );
+  assert.equal(modelLabel("<b>x</b>"), "نموذج غير معروف");
+  assert.equal(modelLabel(undefined), "نموذج غير معروف");
+  assert.equal(modelLabel("a".repeat(90)), "نموذج غير معروف");
+});

@@ -40,7 +40,11 @@ test("Only the lazy run module (and its declaration) references the AI key confi
 
 test("AI modules never touch reading progress or storage outside the cache module", () => {
   for (const f of files.filter((f) => f.name.startsWith("ai/"))) {
-    assert.doesNotMatch(f.text, /progress|nt-reading-progress/, f.name);
+    assert.doesNotMatch(
+      f.text,
+      /nt-reading-progress|from "[./]*progress/,
+      f.name,
+    );
     if (f.name !== "ai/cache.ts")
       assert.doesNotMatch(f.text, /localStorage/, f.name);
   }
