@@ -733,6 +733,25 @@ test("every AI state is accessible in both themes and fits 320px at 38px text", 
   }
 });
 
+test("About the app discloses the AI service", async ({ page }) => {
+  await seedAi(page);
+  await page.goto("/");
+  await ready(page);
+  await page.getByRole("button", { name: "فتح القائمة", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "القائمة", exact: true })
+    .getByRole("button", { name: "About the app" })
+    .click();
+  const about = page.getByRole("dialog", {
+    name: "About the app",
+    exact: true,
+  });
+  await expect(about).toContainText("شرح الآيات بالذكاء الاصطناعي اختياري");
+  await expect(about).toContainText("لا يُرسَل اسمك أو تقدّمك");
+  await noOverflow(page);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
+
 test("only the AI build carries the key, and only in its lazy request chunk", () => {
   const files = (dir: string) => {
     const assets = fileURLToPath(

@@ -69,6 +69,8 @@ test("subtle menu footer opens app credits and restores focus without changing r
     });
     await expect(about).toContainText("شباب كنيسة الإخوة بخلوصي");
     await expect(about).toContainText("لا يدّعي هذا التطبيق أي حقوق نشر");
+    // The default build has no AI explanations, so no AI disclosure.
+    await expect(about).not.toContainText("OpenRouter");
     await expect(
       about.getByRole("link", { name: "albertalfred429@gmail.com" }),
     ).toHaveAttribute("href", "mailto:albertalfred429@gmail.com");
