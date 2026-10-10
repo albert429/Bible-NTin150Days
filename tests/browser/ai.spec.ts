@@ -213,13 +213,18 @@ test("an answer streams in, then the card reports it once and counts it", async 
   await expect(answerArea(page)).toHaveAttribute("aria-busy", "true");
   await expect(remaining(page)).toContainText("٩ من ١٠");
 
+  // A keyboard reader waiting on «إيقاف» keeps a focused control at the end.
+  await study(page).getByRole("button", { name: "إيقاف", exact: true }).focus();
   await open(request, "rest");
   await expect(answerArea(page).locator("li")).toHaveText([
     "قامت وخدمتهم",
     "شفاء كامل",
   ]);
   await expect(answerArea(page)).toHaveAttribute("aria-busy", "false");
-  await expect(live(page)).toHaveText("اكتملت الإجابة");
+  await expect(live(page)).toHaveText("اكتملت الإجابة: اشرح الآية");
+  await expect(
+    study(page).getByRole("button", { name: "إجابة أخرى" }),
+  ).toBeFocused();
   await expect(study(page).locator(".ai-footer")).toContainText(
     "إجابة مولَّدة بالذكاء الاصطناعي، قد تحتوي أخطاء",
   );
@@ -283,6 +288,7 @@ test("a cached answer comes back without a request; «إجابة أخرى» asks
   await openCard(page);
   await chip(page, "الخلفية والسياق").click();
   await expect(answerArea(page)).toContainText("الشرح الأول.");
+  await expect(live(page)).toHaveText("اكتملت الإجابة: الخلفية والسياق");
   await page.reload();
   await ready(page);
   await openCard(page);
@@ -495,6 +501,10 @@ test("an error after the first words keeps them as a partial answer", async ({
   await expect(answerArea(page)).toContainText("إجابة كاملة.");
   await expect(answerArea(page)).not.toContainText("بداية الإجابة");
   await expect(alert(page)).toHaveCount(0);
+  // Focus followed the replaced controls: retry → «إيقاف» → «إجابة أخرى».
+  await expect(
+    study(page).getByRole("button", { name: "إجابة أخرى" }),
+  ).toBeFocused();
 });
 
 test("a stream that stalls after the first words times out as a partial answer", async ({
@@ -555,17 +565,23 @@ test("«إيقاف» keeps what arrived; closing the sheet ends the request", as
   await start(page);
   const stop = study(page).getByRole("button", { name: "إيقاف", exact: true });
 
-  // Before any words: back to the chips, nothing counted.
+  // Before any words (the request is out): back to the chips, no answer counted.
   await chip(page, "اشرح الآية").click();
+  await expect.poll(async () => (await sent(request)).length).toBe(1);
   await stop.click();
   await expect(answerArea(page)).toHaveCount(0);
   await expect(chip(page, "اشرح الآية")).not.toHaveAttribute("aria-disabled");
+  await expect(chip(page, "اشرح الآية")).toBeFocused();
+  await expect(live(page)).toHaveText("أُوقفت الإجابة.");
   expect(await stored(page, USAGE)).toMatchObject({ n: 0, a: 1 });
 
   await chip(page, "اشرح الآية").click();
   await expect(answerArea(page)).toContainText("جزء أول");
   await stop.click();
   await expect(alert(page)).toContainText("أُوقفت الإجابة.");
+  await expect(
+    alert(page).getByRole("button", { name: "إعادة المحاولة" }),
+  ).toBeFocused();
   await expect(answerArea(page)).toContainText("جزء أول");
   await expect(answerArea(page)).toHaveAttribute("aria-busy", "false");
   expect(await stored(page, CACHE)).toBeNull();
@@ -602,6 +618,7 @@ test("a reader's own question is sent as content, never cached, and can be repor
   await field.fill("  لماذا لمس يدها؟ ");
   await field.press("Enter");
   await expect(answerArea(page)).toContainText("لأن اللمس علامة رحمة.");
+  await expect(live(page)).toHaveText("اكتملت الإجابة عن سؤالك");
   const [first] = await sent(request);
   expect(first.body.messages[1].content).toContain(
     "المطلوب:\nأجب عن سؤال القارئ التالي عن هذه الآية: «لماذا لمس يدها؟»",
@@ -647,7 +664,7 @@ test("turning the feature off clears its data and asks for consent again", async
     .click();
   await expect(
     study(page).getByRole("button", { name: "متابعة" }),
-  ).toBeVisible();
+  ).toBeFocused();
   await expect(chip(page, "اشرح الآية")).toHaveCount(0);
   expect(await stored(page, CACHE)).toBeNull();
   expect(await stored(page, CONSENT)).toBeNull();
@@ -731,6 +748,127 @@ test("every AI state is accessible in both themes and fits 320px at 38px text", 
     await check(); // cap
     await closeSheet(page);
   }
+});
+
+test("«إيقاف» works while the study files are still loading, and nothing is sent", async ({
+  page,
+  request,
+}) => {
+  await seedAi(page);
+  // The translations file never arrives.
+  await page.route("**/study/10.tr.json", () => {});
+  await start(page);
+  await chip(page, "اشرح الآية").click();
+  await expect(answerArea(page)).toHaveAttribute("aria-busy", "true");
+  await study(page).getByRole("button", { name: "إيقاف", exact: true }).click();
+  await expect(answerArea(page)).toHaveCount(0);
+  await expect(chip(page, "اشرح الآية")).toBeFocused();
+  expect(await sent(request)).toEqual([]);
+  // No request went out, so no daily attempt was spent.
+  expect(await stored(page, USAGE)).toBeNull();
+});
+
+test("«إجابة أخرى» is offered only when it could run", async ({
+  page,
+  request,
+}) => {
+  await seedAi(page, { usage: { date: "2026-10-01", n: 9, a: 9 } });
+  await queue(request, answer("الإجابة العاشرة."));
+  await start(page);
+  await chip(page, "اشرح الآية").click();
+  await expect(answerArea(page)).toContainText("الإجابة العاشرة.");
+  await expect(remaining(page)).toContainText("٠ من ١٠");
+  // At the device cap a new request would only replace this answer.
+  await expect(
+    study(page).getByRole("button", { name: "إجابة أخرى" }),
+  ).toHaveCount(0);
+  await expect(
+    study(page).getByRole("link", { name: "الإبلاغ عن خطأ" }),
+  ).toBeVisible();
+
+  // During a cooldown it waits, disabled. (Session counts outlive edits to
+  // storage, so start a new page session below the cap.)
+  await page.evaluate(
+    ([key]) =>
+      localStorage.setItem(
+        key,
+        JSON.stringify({ date: "2026-10-01", n: 1, a: 1 }),
+      ),
+    [USAGE],
+  );
+  await page.reload();
+  await ready(page);
+  await openCard(page);
+  await queue(request, {
+    status: 503,
+    json: { error: { code: 503, message: "down" } },
+  });
+  await chip(page, "الخلفية والسياق").click();
+  await expect(alert(page)).toContainText("الخدمة مشغولة الآن.");
+  await chip(page, "اشرح الآية").click();
+  const another = study(page).getByRole("button", { name: "إجابة أخرى" });
+  await expect(another).toHaveAttribute("aria-disabled", "true");
+  await page.clock.runFor(5100);
+  await expect(another).not.toHaveAttribute("aria-disabled");
+});
+
+test("a rate-limit wait is bounded even when the reset time is far off", async ({
+  page,
+  request,
+}) => {
+  await seedAi(page);
+  await queue(request, {
+    status: 429,
+    json: {
+      error: {
+        code: 429,
+        message: "Rate limit exceeded: free-models-per-min. ",
+        metadata: {
+          headers: {
+            "X-RateLimit-Reset": String(Date.parse("2026-10-01T13:00:00Z")),
+          },
+          provider_name: null,
+        },
+      },
+    },
+  });
+  await start(page);
+  await chip(page, "اشرح الآية").click();
+  const retry = alert(page).getByRole("button", { name: "إعادة المحاولة" });
+  await expect(retry).toHaveAttribute("aria-disabled", "true");
+  await page.clock.runFor(66000);
+  await expect(retry).not.toHaveAttribute("aria-disabled");
+});
+
+test("an answer that is only hidden reasoning is empty and backs off", async ({
+  page,
+  request,
+}) => {
+  await seedAi(page);
+  await queue(request, answer("<think>تفكير فقط</think>"));
+  await start(page);
+  await chip(page, "اشرح الآية").click();
+  await expect(alert(page)).toContainText("لم تصل إجابة هذه المرة.");
+  const retry = alert(page).getByRole("button", { name: "إعادة المحاولة" });
+  await expect(retry).toHaveAttribute("aria-disabled", "true");
+  await page.clock.runFor(5100);
+  await expect(retry).not.toHaveAttribute("aria-disabled");
+  expect(await stored(page, USAGE)).toMatchObject({ n: 0, a: 1 });
+  expect(await stored(page, CACHE)).toBeNull();
+});
+
+test("a numbered list split by a paragraph keeps its numbering", async ({
+  page,
+  request,
+}) => {
+  await seedAi(page);
+  await queue(request, answer("1. أولًا\n2. ثانيًا\nتوضيح\n3. ثالثًا"));
+  await start(page);
+  await chip(page, "معاني الكلمات").click();
+  const lists = answerArea(page).locator("ol");
+  await expect(lists).toHaveCount(2);
+  await expect(lists.nth(0)).not.toHaveAttribute("start");
+  await expect(lists.nth(1)).toHaveAttribute("start", "3");
 });
 
 test("About the app discloses the AI service", async ({ page }) => {

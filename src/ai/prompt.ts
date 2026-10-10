@@ -59,18 +59,25 @@ export function plainArabic(text: string) {
   return text.replace(/[ؐ-ًؚ-ٰٟۖ-ۭـ]/g, "").replace(/ٱ/g, "ا");
 }
 
-/** Lexicon definitions without markup, Scripture references or "al." noise. */
+/**
+ * Lexicon definitions without markup, Scripture references or "al." noise.
+ * References go first, while "__" still guards sense numbers ("…, __2."), and
+ * a continuation number never swallows the next book's digit ("2Co."). A run
+ * of marks left by a removed reference keeps a full stop, else its first mark.
+ */
 export function cleanDefinition(definition: string) {
   return definition
-    .replace(/__/g, "")
     .replace(
-      /\b[1-3]?[A-Z][a-z]{1,2}\.\d+:\d+(?:[-–]\d+)?(?:,\s*\d+(?::\d+)?(?:[-–]\d+)?)*/g,
+      /\b[1-4]?[A-Z][a-z]{1,2}\.\d+(?:[:.]\d+)?(?:[-–]\d+)?(?:,\s*\d+(?::\d+)?(?:[-–]\d+)?(?!\w))*/g,
       "",
     )
+    .replace(/__/g, "")
     .replace(/\bal\.(?:\s*mult\.)?/g, "")
     .replace(/\(\s*[,;]?\s*\)/g, "")
     .replace(/\s+([,;:.])/g, "$1")
-    .replace(/([,;])(?:\s*[,;])+/g, "$1")
+    .replace(/[,;:](?:\s*[,;:.])+/g, (run) =>
+      run.includes(".") ? "." : run[0],
+    )
     .replace(/\s+/g, " ")
     .trim();
 }

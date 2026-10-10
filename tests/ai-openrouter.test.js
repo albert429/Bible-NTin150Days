@@ -186,6 +186,42 @@ test("An unavailable model list gets exactly one retry through the free router",
   assert.equal(count, 1);
 });
 
+test("No router retry once text has arrived: answers are never spliced", async () => {
+  for (const code of [400, "404"]) {
+    let calls = 0;
+    const provider = createOpenRouter(options, async () => {
+      calls += 1;
+      return calls === 1
+        ? sse(
+            {
+              model: "google/gemma-4-31b-it:free",
+              choices: [{ delta: { content: "بداية" } }],
+            },
+            {
+              error: { code, message: "bad" },
+              choices: [{ delta: { content: "" }, finish_reason: "error" }],
+            },
+          )
+        : ok("other/model:free");
+    });
+    let text = "";
+    await assert.rejects(
+      provider.stream(request, new AbortController().signal, {
+        ...callbacks(),
+        onText(delta) {
+          text += delta;
+        },
+      }),
+      (error) =>
+        error instanceof AiError &&
+        error.kind === "unavailable" &&
+        error.afterFirstToken === true,
+    );
+    assert.equal(calls, 1, String(code));
+    assert.equal(text, "بداية");
+  }
+});
+
 test("Network failures and aborts are told apart", async () => {
   const offline = createOpenRouter(options, async () => {
     throw new TypeError("Failed to fetch");

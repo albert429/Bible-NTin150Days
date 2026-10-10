@@ -5,8 +5,15 @@ export const verseId = (usfm: string, chapter: number, verse: number) =>
 
 export const tokens = (text: string) => text.split(" ");
 
-/** A Greek token without trailing punctuation ("λόγος," → "λόγος"). */
-export const greekWord = (word: string) => word.replace(/[,.;·:]+$/, "");
+/**
+ * A Greek token without editorial marks or punctuation ("λόγος," → "λόγος"):
+ * ASCII and Greek stops (U+0387 ano teleia, U+037E question mark), pilcrows,
+ * brackets. Elision marks (U+1FBD, U+2019) belong to the word and stay.
+ */
+export const greekWord = (word: string) =>
+  word
+    .replace(/^[[\]]+/, "")
+    .replace(/[\s,.;:\u00b7\u0387\u037e\u00b6\u00ac[\]]+$/u, "");
 /** An English gloss without a trailing full stop. */
 export const gloss = (value: string) => value.replace(/\.$/, "");
 

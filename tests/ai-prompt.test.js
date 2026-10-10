@@ -94,9 +94,13 @@ test("Greek words use the lexicon gloss; definitions only for the words chip", (
     buildPrompt("explain", material).prompt,
     /الكلمات اليونانية/,
   );
-  assert.doesNotMatch(
-    buildPrompt("ask", material, "ما معنى لمس؟").prompt,
-    /التعريف:/,
+  const asked = buildPrompt("ask", material, "ما معنى لمس؟").prompt;
+  assert.doesNotMatch(asked, /التعريف:/);
+  assert.match(asked, /G0681: to touch/);
+  // Without the lexicon (it failed to load), the token gloss is the fallback.
+  assert.match(
+    buildPrompt("ask", { ...material, lex: undefined }, "ما معنى لمس؟").prompt,
+    /G0681: to kindle/,
   );
   assert.match(
     buildPrompt("words", { ...material, g: [] }).prompt,
@@ -117,6 +121,30 @@ test("Context is clipped at passage edges and missing translations are omitted",
     tr: { n: { b: "15-16", t: "نص" } },
   }).prompt;
   assert.match(bridged, /ترجمة كتاب الحياة:\n\(الآيات 15-16\) نص/);
+});
+
+test("Context is exactly three verses either side, clipped at the passage edges", () => {
+  const long = Array.from({ length: 10 }, (_, i) => ({
+    number: 14 + i,
+    text: `نص الآية ${14 + i}`,
+    ...(i === 0 ? { heading: "عنوان أول" } : {}),
+    ...(i === 6 ? { heading: "عنوان ثان" } : {}),
+  }));
+  const at = (number) =>
+    buildPrompt("explain", {
+      ...material,
+      passage: { ...passage, verses: long },
+      verse: long[number - 14],
+      tr: undefined,
+    }).prompt;
+  const middle = at(18);
+  assert.match(middle, /\(متى 8:15–21\):\n\[15\]/);
+  assert.doesNotMatch(middle, /\[14\]|\[22\]/);
+  assert.match(middle, /\[18\] نص الآية 18 ← الآية المقصودة/);
+  assert.match(middle, /عنوان الفقرة: عنوان أول/);
+  assert.match(at(14), /\(متى 8:14–17\)/);
+  assert.match(at(23), /\(متى 8:20–23\)/);
+  assert.match(at(21), /عنوان الفقرة: عنوان ثان/);
 });
 
 test("A reader's question is cleaned, bounded and wrapped as content, with the off-topic rule", () => {
@@ -161,8 +189,26 @@ test("Prompts stay bounded and never read device storage", () => {
 
 test("Arabic is undiacritized and definitions are cleaned", () => {
   assert.equal(plainArabic("ٱلْكَلِمَةُ ـــ"), "الكلمة ");
-  assert.equal(
-    cleanDefinition("__2. a saying: Mat.19:22 (T om.), 1Co.14:9, 19 al."),
-    "2. a saying: (T om.),",
-  );
+  const cases = [
+    [
+      "__2. a saying: Mat.19:22 (T om.), 1Co.14:9, 19 al.",
+      "2. a saying: (T om.),",
+    ],
+    // A continuation number never swallows the next numbered book.
+    ["sorrow, 2Co.7:10, 2Co.7:11; grief.", "sorrow, grief."],
+    ["as in 1Co.7:11, 2Co.7:11, 12.", "as in."],
+    // Sense numbers survive.
+    [
+      "of the end, Jhn.13:1; Rev.1:1-3, 5; __2. later.",
+      "of the end, 2. later.",
+    ],
+    ["in 4Ma.5:3, Wis.2:1.", "in."],
+    // Chapterless and dotted references.
+    [
+      "to do good; (a) univ., 3Jo.11; (b) others",
+      "to do good; (a) univ., (b) others",
+    ],
+    ["(Mat.5.3) blessed", "blessed"],
+  ];
+  for (const [raw, clean] of cases) assert.equal(cleanDefinition(raw), clean);
 });

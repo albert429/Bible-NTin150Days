@@ -161,3 +161,37 @@ test("Consent is versioned; clearing removes answers and consent but never progr
   assert.equal(s.map.get("nt-reading-progress-v1"), "{}");
   assert.equal(s.touched.has("nt-reading-progress-v1"), false);
 });
+
+test("Without working storage, counts and consent still hold for the session", () => {
+  const date = "2026-10-12";
+  const full = {
+    getItem: () => null,
+    setItem: () => {
+      throw new Error("QuotaExceeded");
+    },
+    removeItem: () => {},
+  };
+  for (const storage of [null, full]) {
+    recordAttempt(storage, date);
+    recordAnswer(storage, date);
+    assert.deepEqual(recordAnswer(storage, date), { date, n: 2, a: 1 });
+    assert.deepEqual(usage(storage, date), { date, n: 2, a: 1 });
+    assert.deepEqual(usage(storage, "2026-10-13"), {
+      date: "2026-10-13",
+      n: 0,
+      a: 0,
+    });
+    assert.equal(hasConsent(storage), false);
+    giveConsent(storage);
+    assert.equal(hasConsent(storage), true);
+    clearAiData(storage);
+    assert.equal(hasConsent(storage), false);
+  }
+  // Each storage is separate; a working one keeps consent only in storage, so
+  // revoking it elsewhere (another tab) takes effect.
+  assert.deepEqual(usage(memory(), date), { date, n: 0, a: 0 });
+  const s = memory();
+  giveConsent(s);
+  s.map.delete(consentKey());
+  assert.equal(hasConsent(s), false);
+});

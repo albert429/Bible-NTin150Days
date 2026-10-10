@@ -83,7 +83,7 @@ For local testing, put the values in `.env.development.local`. `npm run dev` rea
 
 ### Loading
 
-`StudyPanel.tsx` imports the card only when `__AI_ENABLED__` is true; otherwise Rollup drops it. The `AiPanel-*` chunk (interface, prompt, cache, formatting) loads when the card first opens. The `run-*` chunk (streaming, the provider and the key) loads on the first request that the on-device cache cannot answer. The main `index-*` chunk is the same either way.
+`StudyPanel.tsx` imports the card only when `__AI_ENABLED__` is true; otherwise Rollup drops it. The `AiPanel-*` chunk (interface, chip labels, cache, formatting) loads when the card first opens. The `run-*` chunk (prompt, streaming, the provider and the key) loads on the first request that the on-device cache cannot answer. That request also loads the day's `{day}.tr.json`, plus `{day}.lex.json` for «معاني الكلمات» and typed questions, through the same cache as the study cards. «إيقاف» takes effect at once, even while these are still loading, and a daily attempt counts only once the request is actually sent. The main `index-*` chunk is the same either way.
 
 ### What is sent
 
@@ -93,7 +93,7 @@ Each request is one POST to `/chat/completions`. It carries:
 - the reference and section heading;
 - the verse and up to three verses either side, in Van Dyck without diacritics;
 - the verse in كتاب الحياة and the KJV;
-- the key Greek words, for «معاني الكلمات» and typed questions, with lexicon definitions for «معاني الكلمات» only;
+- the key Greek words with their lexicon meanings, for «معاني الكلمات» and typed questions, plus lexicon definitions (references removed) for «معاني الكلمات» only;
 - the task, or the reader's question.
 
 It never carries the reader's name, plan day, dates or progress. The headers are the key, `HTTP-Referer` (the site origin), `X-OpenRouter-Title: Bible150` and `X-OpenRouter-App-Visibility: hidden`, and the request sends no cookies.
@@ -102,9 +102,9 @@ OpenRouter sees the reader's IP address. Free-model providers may keep prompts a
 
 ### Limits and on-device data
 
-- **The free allowance belongs to the OpenRouter account, so every reader shares it.** It is 20 requests a minute and 50 a day, rising to 1,000 a day after a one-time purchase of at least $10. It resets at 00:00 UTC. A group that taps the card together, for example during a meeting, can hit the per-minute limit. Those readers see «الخدمة مشغولة الآن» and can retry after about 30 seconds. When the daily allowance runs out, everyone sees «انتهت حصة الخدمة المشتركة اليوم».
+- **The free allowance belongs to the OpenRouter account, so every reader shares it.** It is 20 requests a minute and 50 a day, rising to 1,000 a day after a one-time purchase of at least $10. It resets at 00:00 UTC. A group that taps the card together, for example during a meeting, can hit the per-minute limit. Those readers see «الخدمة مشغولة الآن» and can retry after 30 seconds to about a minute (OpenRouter's reset time, bounded in case the phone's clock is wrong). When the daily allowance runs out, everyone sees «انتهت حصة الخدمة المشتركة اليوم».
 - **The key is public and cannot be restricted to this site.** Anyone who copies it can use up the shared allowance until the key is rotated. Only a server could prevent this. The checklist below keeps spending at $0 and the models free.
-- **Each device has its own daily caps:** 10 answers and 20 requests by default. Chip answers are cached on the device (`nt-ai-cache-v1`, at most 60 answers); typed questions are not cached. Usage is stored in `nt-ai-usage-v1` and consent in `nt-ai-consent-v1`. «إيقاف الميزة ومسح بياناتها» removes the cache and the consent. None of these keys are part of progress backups.
+- **Each device has its own daily caps:** 10 answers and 20 requests by default. Chip answers are cached on the device (`nt-ai-cache-v1`, at most 60 answers); typed questions are not cached. Usage is stored in `nt-ai-usage-v1` and consent in `nt-ai-consent-v1`. «إيقاف الميزة ومسح بياناتها» removes the cache and the consent. None of these keys are part of progress backups. If the browser blocks storage, counts and consent last until the page reloads, so the caps still apply.
 - **Errors use fixed Arabic messages.** Server error text is never shown.
 
 When the prompt, chips or models change, bump `PROMPT_VERSION` in `src/ai/chips.ts` so cached answers are dropped. When what is sent, or who receives it, changes, bump `DISCLOSURE_VERSION` in `src/ai/cache.ts` so readers see the notice again.
@@ -124,11 +124,12 @@ When the prompt, chips or models change, bump `PROMPT_VERSION` in `src/ai/chips.
    curl -sSN https://openrouter.ai/api/v1/chat/completions \
      -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
      -H "HTTP-Referer: https://sfk-bible-reading.vercel.app/" -H "X-OpenRouter-Title: Bible150" \
+     -H "X-OpenRouter-App-Visibility: hidden" \
      -d '{"models":["google/gemma-4-31b-it:free","google/gemma-4-26b-a4b-it:free","openrouter/free"],"messages":[{"role":"user","content":"اشرح يوحنا 3:16 في جملتين."}],"stream":true,"max_tokens":2000,"temperature":0.3,"reasoning":{"exclude":true}}'
    curl -sS https://openrouter.ai/api/v1/key -H "Authorization: Bearer $KEY"
    ```
 
-   The stream should name a `"model"` in each chunk. Also confirm that:
+   Keep all three attribution headers on every manual request: the first request with the site's `HTTP-Referer` creates the app's OpenRouter entry, and its visibility is set then. The stream should name a `"model"` in each chunk. Also confirm that:
    - `"models":["openrouter/free"]` on its own answers;
    - a paid model returns 402;
    - a free model outside the guardrail returns 403.
@@ -136,7 +137,7 @@ When the prompt, chips or models change, bump `PROMPT_VERSION` in `src/ai/chips.
    The `/key` response shows the limit and `free_model_daily_requests`.
 
 5. **Optionally buy $10 of credit once**, which raises the daily allowance to 1,000, then remove the card.
-6. **Try the feature locally.** With the key in `.env.development.local`, run `npm run dev` and try about ten verses with each chip and a few questions. Ask church leadership to review sample answers, and run `npm run ai:models`.
+6. **Try the feature locally.** With the key in `.env.development.local`, run `npm run dev` and try about ten verses with each chip and a few questions. Ask church leadership to review sample answers, and run `npm run ai:models`. It reads the same variables as the build, from the production env files, then the development ones; values that exist only in Vercel can be passed in the shell, e.g. `VITE_OPENROUTER_MODELS=a:free,b:free npm run ai:models`. It never needs or sends the key.
 7. **Turn it on in Vercel.** In Project → Settings → Environment Variables, set `VITE_AI_PROVIDERS=openrouter` and `VITE_OPENROUTER_API_KEY` for **Production only**, then redeploy. The variables are read at build time.
 8. **Test on a real phone.** The next day, check `/api/v1/key` again to confirm the key is still active.
 9. **Every week,** review the activity page and run `npm run ai:models`. Free models are renamed and retired.
@@ -155,7 +156,8 @@ When the prompt, chips or models change, bump `PROMPT_VERSION` in `src/ai/chips.
 - the fallback chain and its timeouts;
 - the prompt;
 - answer formatting;
-- the cache;
+- the cache, including the session fallback when storage is blocked;
+- the request path in `run.ts` (which study files load, stopping before anything is sent);
 - static rules: no `import.meta.env`, no HTML injection, and the key confined to `run.ts`.
 
 The `ai-chromium` Playwright project builds `dist-ai/` with a dummy key and serves it on port 4174. It runs `tests/browser/ai.spec.ts` against `scripts/sse-stub.mjs`, a scriptable local stand-in for the streaming API on port 4175. No test reaches OpenRouter, and CI needs no secrets.
@@ -219,4 +221,4 @@ The focused responsiveness pass was compared against `781e060`, with three runs 
 
 The verse study panel was compared against `81c73c4` with six runs per build (two rounds of three) under the same mobile Lighthouse throttling: median performance **91.5 → 91**, accessibility **100 → 100**, LCP **3,080 → 3,154ms**, CLS **0.08742 → 0.08742**, and total transfer **490.8 → 491.6KB**. Simulated LCP took only two values in both builds, about 3,005 or 3,155ms (one round trip apart); the baseline landed on the higher value in 3 of 6 runs and the new build in 5 of 6. Initial JavaScript grew by **0.72KB** and CSS by **0.09KB** gzipped; study code (3.4KB) and styles (0.7KB) load only after a reader first presses the text. The first verse still starts at about **162px** at 390×844.
 
-The optional AI explanations leave the default build's sizes unchanged: `index` 82.0KB and `StudyPanel` 3.7KB gzipped, with no AI chunks or text. In an AI build, `StudyPanel` grows by 0.5KB. The card's own chunk (`AiPanel`, 5.4KB plus 0.65KB CSS) loads when the card first opens, and the request chunk (`run`, 5.1KB) loads on the first request. Lighthouse was not re-run, because nothing that loads before a reader opens a verse changed.
+The optional AI explanations leave the default build's sizes unchanged: `index` 82.0KB and `StudyPanel` 3.7KB gzipped, with no AI chunks or text. In an AI build, `StudyPanel` grows by 0.5KB. The card's own chunk (`AiPanel`, 6.2KB plus 0.65KB CSS) loads when the card first opens, and the request chunk (`run`, 5.2KB) loads on the first request. Lighthouse was not re-run, because nothing that loads before a reader opens a verse changed.

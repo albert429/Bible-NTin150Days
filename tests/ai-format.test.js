@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cleanAnswer, modelLabel, parseAnswer } from "../src/ai/format.ts";
+import {
+  cleanAnswer,
+  clip,
+  modelLabel,
+  parseAnswer,
+  wellFormed,
+} from "../src/ai/format.ts";
 
 const texts = (blocks) => JSON.stringify(blocks);
 
@@ -48,9 +54,31 @@ test("Paragraphs, lists, headings and bold become blocks", () => {
       ],
     },
     { kind: "ul", items: [[{ text: "أولًا" }], [{ text: "ثانيًا" }]] },
-    { kind: "ol", items: [[{ text: "واحد" }], [{ text: "اثنان" }]] },
+    { kind: "ol", start: 1, items: [[{ text: "واحد" }], [{ text: "اثنان" }]] },
     { kind: "p", inlines: [{ text: "اقتباس **غير مغلق" }] },
   ]);
+});
+
+test("A numbered list split by a paragraph continues from the model's number", () => {
+  const blocks = parseAnswer("1. أ\n2. ب\nفقرة\n3. ج\n٤) د");
+  assert.deepEqual(
+    blocks.map((b) => [b.kind, b.start, (b.items ?? []).length]),
+    [
+      ["ol", 1, 2],
+      ["p", undefined, 0],
+      ["ol", 3, 2],
+    ],
+  );
+  assert.equal(parseAnswer("٧. سابعًا")[0].start, 7);
+});
+
+test("Lone surrogates are dropped, so the text always URI-encodes", () => {
+  assert.equal(wellFormed("a\uD83Db\uDE00c😀"), "abc😀");
+  assert.equal(cleanAnswer("x\uDC00y"), "xy");
+  assert.equal(clip("😀😀", 3), "😀");
+  const long = "ا".repeat(1499) + "😀";
+  assert.doesNotThrow(() => encodeURIComponent(clip(long, 1500)));
+  assert.throws(() => encodeURIComponent(long.slice(0, 1500)), URIError);
 });
 
 test("Pathological input parses quickly (no catastrophic backtracking)", () => {

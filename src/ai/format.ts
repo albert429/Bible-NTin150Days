@@ -8,7 +8,18 @@ const TARGET = String.raw`\((?:[^()\n]|\([^()\n]{0,100}\)){0,500}\)`;
 
 export type Inline = { text: string; bold?: true };
 export type Block =
-  { kind: "p"; inlines: Inline[] } | { kind: "ul" | "ol"; items: Inline[][] };
+  | { kind: "p"; inlines: Inline[] }
+  | { kind: "ul"; items: Inline[][] }
+  | { kind: "ol"; start: number; items: Inline[][] };
+
+/** Drop lone UTF-16 surrogates (a pair cut in two), which make encodeURIComponent throw. */
+export const wellFormed = (text: string) =>
+  text.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\uD800-\uDFFF]/g, (unit) =>
+    unit.length === 2 ? unit : "",
+  );
+/** The first `max` UTF-16 units, never ending inside a surrogate pair. */
+export const clip = (text: string, max: number) =>
+  wellFormed(text.slice(0, max));
 
 export function cleanAnswer(raw: string) {
   let text = raw.replace(/\r\n?/g, "\n");
@@ -16,7 +27,7 @@ export function cleanAnswer(raw: string) {
   // Hidden reasoning that has not closed yet (still streaming): drop the rest.
   const open = text.search(/<think>/i);
   if (open >= 0) text = text.slice(0, open);
-  return text
+  text = text
     .replace(/\t/g, " ")
     .replace(/[‪-‮⁦-⁩]/g, "")
     .replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g, "")
@@ -24,6 +35,7 @@ export function cleanAnswer(raw: string) {
     .replace(new RegExp(`!\\[[^\\]\\n]{0,200}\\]${TARGET}`, "g"), "")
     .replace(new RegExp(`\\[([^\\]\\n]{0,200})\\]${TARGET}`, "g"), "$1")
     .trim();
+  return wellFormed(text);
 }
 
 function inlines(text: string): Inline[] {
@@ -50,14 +62,26 @@ export function parseAnswer(text: string): Block[] {
       continue;
     }
     const bullet = /^[-•*]\s+(.+)$/.exec(line);
-    const numbered = /^(?:\d{1,3}|[٠-٩]{1,3})[.)]\s+(.+)$/.exec(line);
-    const item = bullet ?? numbered;
-    if (item) {
-      const kind = bullet ? "ul" : "ol";
-      const previous = blocks[blocks.length - 1];
-      if (previous && previous.kind === kind)
-        previous.items.push(inlines(item[1]));
-      else blocks.push({ kind, items: [inlines(item[1])] });
+    const numbered = /^(\d{1,3}|[٠-٩]{1,3})[.)]\s+(.+)$/.exec(line);
+    const previous = blocks[blocks.length - 1];
+    if (bullet) {
+      if (previous?.kind === "ul") previous.items.push(inlines(bullet[1]));
+      else blocks.push({ kind: "ul", items: [inlines(bullet[1])] });
+      continue;
+    }
+    if (numbered) {
+      if (previous?.kind === "ol") previous.items.push(inlines(numbered[2]));
+      else {
+        // Keep the model's number, so a list split by a paragraph continues.
+        const digits = numbered[1].replace(/[٠-٩]/g, (d) =>
+          String(d.charCodeAt(0) - 0x660),
+        );
+        blocks.push({
+          kind: "ol",
+          start: Number(digits),
+          items: [inlines(numbered[2])],
+        });
+      }
       continue;
     }
     blocks.push({ kind: "p", inlines: inlines(line) });

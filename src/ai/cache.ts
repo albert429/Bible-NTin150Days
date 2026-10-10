@@ -104,8 +104,14 @@ export function saveAnswer(
   writeEntries(storage, entries);
 }
 
-/** Today's answers (n) and requests (a) on this device; another date is 0. */
-export function usage(storage: StorageLike | null, date: string): Usage {
+// When storage is missing or refuses writes, counts and consent still hold
+// for this page session. Keyed by storage object, so each storage is separate.
+const NO_STORAGE = {};
+const sessionUsage = new WeakMap<object, Usage>();
+const sessionConsent = new WeakSet<object>();
+const slot = (storage: StorageLike | null) => storage ?? NO_STORAGE;
+
+function storedUsage(storage: StorageLike | null, date: string): Usage {
   try {
     const data = JSON.parse(storage?.getItem(USAGE_KEY) ?? "null");
     if (
@@ -122,13 +128,26 @@ export function usage(storage: StorageLike | null, date: string): Usage {
   return { date, n: 0, a: 0 };
 }
 
+/** Today's answers (n) and requests (a) on this device; another date is 0. */
+export function usage(storage: StorageLike | null, date: string): Usage {
+  const stored = storedUsage(storage, date);
+  const session = sessionUsage.get(slot(storage));
+  if (session?.date !== date) return stored;
+  return {
+    date,
+    n: Math.max(stored.n, session.n),
+    a: Math.max(stored.a, session.a),
+  };
+}
+
 function bump(storage: StorageLike | null, date: string, field: "n" | "a") {
   const next = usage(storage, date);
   next[field] += 1;
+  sessionUsage.set(slot(storage), { ...next });
   try {
     storage?.setItem(USAGE_KEY, JSON.stringify(next));
   } catch {
-    // Not persisted; the in-memory count still applies for this view.
+    // Not persisted; the session count still applies until the page reloads.
   }
   return next;
 }
@@ -138,6 +157,7 @@ export const recordAnswer = (storage: StorageLike | null, date: string) =>
   bump(storage, date, "n");
 
 export function hasConsent(storage: StorageLike | null) {
+  if (sessionConsent.has(slot(storage))) return true;
   try {
     return storage?.getItem(consentKey()) === "1";
   } catch {
@@ -147,14 +167,18 @@ export function hasConsent(storage: StorageLike | null) {
 
 export function giveConsent(storage: StorageLike | null) {
   try {
-    storage?.setItem(consentKey(), "1");
+    if (!storage) throw new Error("no storage");
+    storage.setItem(consentKey(), "1");
   } catch {
-    // Without storage, consent lasts until the page reloads.
+    // Not saved: consent lasts until the page reloads. (A saved consent stays
+    // revocable from another tab, so it is not also kept in the session.)
+    sessionConsent.add(slot(storage));
   }
 }
 
 /** Revoke consent and delete cached answers. Usage counts stay (they hold no content). */
 export function clearAiData(storage: StorageLike | null) {
+  sessionConsent.delete(slot(storage));
   try {
     storage?.removeItem(CACHE_KEY);
     for (let v = 1; v <= DISCLOSURE_VERSION; v++)

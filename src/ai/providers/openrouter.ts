@@ -100,12 +100,14 @@ export function createOpenRouter(
       try {
         return await attempt(options.models, request, signal, callbacks);
       } catch (error) {
-        // A stale slug or a data-policy mismatch: one last try with the router.
+        // A stale slug or a data-policy mismatch: one last try with the router,
+        // but never after text arrived (answers are not spliced).
         const routerOnly =
           options.models.length === 1 && options.models[0] === ROUTER_MODEL;
         if (
           error instanceof AiError &&
           error.kind === "unavailable" &&
+          !error.afterFirstToken &&
           !routerOnly &&
           !signal.aborted
         )

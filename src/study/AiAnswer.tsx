@@ -32,7 +32,7 @@ export default function AiAnswer({ blocks }: { blocks: Block[] }) {
             ))}
           </ul>
         ) : (
-          <ol key={index}>
+          <ol key={index} start={block.start === 1 ? undefined : block.start}>
             {block.items.map((item, i) => (
               <li key={i} dir="auto">
                 <Inlines parts={item} />

@@ -1,5 +1,12 @@
 import "./ai.css";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { RefreshCw } from "lucide-react";
 import {
   answerKey,
@@ -12,12 +19,15 @@ import {
   recordAttempt,
   saveAnswer,
   usage,
+  type StorageLike,
 } from "../ai/cache.ts";
 import {
   cleanAnswer,
+  clip,
   MAX_TEXT,
   modelLabel,
   parseAnswer,
+  wellFormed,
 } from "../ai/format.ts";
 import {
   CHIPS,
@@ -26,7 +36,12 @@ import {
   QUESTION_MAX,
   QUESTION_MIN,
 } from "../ai/chips.ts";
-import { AiError, type AiErrorKind, type ChipId } from "../ai/types.ts";
+import {
+  abortable,
+  AiError,
+  type AiErrorKind,
+  type ChipId,
+} from "../ai/types.ts";
 import { APP_INFO } from "../appInfo";
 import { ar, today } from "../format";
 import type { Passage, Verse } from "../readings";
@@ -53,6 +68,8 @@ type View =
       problem: Problem;
       partial?: string;
       model?: string;
+      /** The run that failed: a repeated, identical alert is announced again. */
+      n: number;
     };
 
 // Session-wide guards that protect the shared OpenRouter allowance.
@@ -86,6 +103,33 @@ const RETRYABLE = new Set<Problem>([
   "aborted",
 ]);
 
+/** Why a new request would be refused right now, if it would be. */
+function refusal(storage: StorageLike | null, date: string) {
+  if (quotaReached) return "quota";
+  const { n, a } = usage(storage, date);
+  if (n >= __AI_DAILY_CAP__) return "cap";
+  if (a >= __AI_ATTEMPT_CAP__) return "attempts";
+  if (Date.now() < coolUntil) return "rate";
+}
+
+/** Session guards after a failure that left no answer text. */
+function backOff(kind: Problem, retryAt?: number) {
+  const now = Date.now();
+  if (kind === "quota") quotaReached = true;
+  else if (kind === "rate")
+    // The service's reset time, bounded: the device clock may be wrong.
+    coolUntil = now + Math.min(65000, Math.max(30000, (retryAt ?? 0) - now));
+  else if (RETRYABLE.has(kind)) {
+    failures += 1;
+    coolUntil = now + (failures === 1 ? 5000 : 15000);
+  }
+}
+
+const finished = (chip: ChipId) =>
+  chip === "ask"
+    ? "اكتملت الإجابة عن سؤالك"
+    : `اكتملت الإجابة: ${CHIPS.find((c) => c.id === chip)?.label}`;
+
 export default function AiPanel({
   day,
   id,
@@ -108,15 +152,28 @@ export default function AiPanel({
   const [status, setStatus] = useState("");
   const [, setTick] = useState(0);
   const controller = useRef<AbortController | null>(null);
+  const runs = useRef(0);
   const answerRef = useRef<HTMLDivElement>(null);
-  const firstChip = useRef<HTMLButtonElement>(null);
+  // Focus targets for when the focused control disappears (see below).
+  const root = useRef<HTMLDivElement>(null);
+  const lastFocus = useRef<HTMLElement | null>(null);
+  const lastChip = useRef<ChipId | null>(null);
+  const chipButtons = useRef<Partial<Record<ChipId, HTMLButtonElement | null>>>(
+    {},
+  );
+  const askButton = useRef<HTMLButtonElement>(null);
+  const stopButton = useRef<HTMLButtonElement>(null);
+  const retryButton = useRef<HTMLButtonElement>(null);
+  const anotherButton = useRef<HTMLButtonElement>(null);
+  const reportLink = useRef<HTMLAnchorElement>(null);
+  const proceedButton = useRef<HTMLButtonElement>(null);
   const busy = view.s === "loading" || view.s === "streaming";
 
   // Closing the sheet, or another verse or day, ends a request in flight.
   useEffect(() => () => controller.current?.abort("unmount"), []);
 
-  // Re-enable «إعادة المحاولة» when a cooldown ends.
-  const cooling = view.s === "error" && Date.now() < coolUntil;
+  // Re-enable «إعادة المحاولة» and «إجابة أخرى» when a cooldown ends.
+  const cooling = !busy && view.s !== "idle" && Date.now() < coolUntil;
   useEffect(() => {
     if (!cooling) return;
     const timer = setTimeout(
@@ -125,6 +182,32 @@ export default function AiPanel({
     );
     return () => clearTimeout(timer);
   }, [cooling, view]);
+
+  // A control that unmounts while focused («إيقاف» when the answer ends, a
+  // button replaced by its result) would drop focus to <body> inside the modal
+  // sheet. Move it to the control that took its place instead.
+  useLayoutEffect(() => {
+    const lost = lastFocus.current;
+    if (!lost || lost.isConnected) return;
+    lastFocus.current = null;
+    const active = document.activeElement;
+    if (active && active !== document.body && !active.contains(root.current))
+      return;
+    const chip = view.s === "idle" ? lastChip.current : view.chip;
+    const target = !consent
+      ? proceedButton.current
+      : (stopButton.current ??
+        retryButton.current ??
+        anotherButton.current ??
+        reportLink.current ??
+        (chip === "ask"
+          ? askButton.current
+          : chip
+            ? chipButtons.current[chip]
+            : null) ??
+        chipButtons.current[CHIPS[0].id]);
+    target?.focus({ preventScroll: true });
+  });
 
   async function run(
     chip: ChipId,
@@ -136,26 +219,26 @@ export default function AiPanel({
       if (text.length < QUESTION_MIN) return;
       setAsked(text);
     }
+    const n = ++runs.current;
+    lastChip.current = chip;
     const key = chip === "ask" ? null : answerKey(id, chip, PROMPT_VERSION);
     if (key && !options.fresh) {
       const cached = readAnswer(storage, key);
       if (cached) {
         setView({ s: "done", chip, ...cached, truncated: !!cached.truncated });
-        setStatus("اكتملت الإجابة");
+        setStatus(finished(chip));
         return;
       }
     }
     const date = today();
-    const counts = usage(storage, date);
-    const stop = (problem: Problem) => setView({ s: "error", chip, problem });
-    if (quotaReached) return stop("quota");
-    if (counts.n >= __AI_DAILY_CAP__) return stop("cap");
-    if (counts.a >= __AI_ATTEMPT_CAP__) return stop("attempts");
-    if (Date.now() < coolUntil) return stop("rate");
+    const refused = refusal(storage, date);
+    if (refused) {
+      setView({ s: "error", chip, problem: refused, n });
+      return;
+    }
 
     const current = new AbortController();
     controller.current = current;
-    recordAttempt(storage, date);
     setView({ s: "loading", chip, thinking: false });
     setStatus("جارٍ إعداد الإجابة…");
     let raw = "";
@@ -169,9 +252,10 @@ export default function AiPanel({
       if (shown) setView({ s: "streaming", chip, text: shown, model });
     };
     const finish = () => {
-      const answer = cleanAnswer(raw).slice(0, MAX_TEXT);
+      const answer = clip(cleanAnswer(raw), MAX_TEXT);
       if (!answer) {
-        setView({ s: "error", chip, problem: "empty" });
+        backOff("empty");
+        setView({ s: "error", chip, problem: "empty", n });
         setStatus("");
         return;
       }
@@ -186,11 +270,12 @@ export default function AiPanel({
           PROMPT_VERSION,
         );
       setView({ s: "done", chip, text: answer, model, truncated });
-      setStatus("اكتملت الإجابة");
+      setStatus(finished(chip));
     };
 
     try {
-      const { ask } = await import("../ai/run.ts");
+      // Neither the chunk nor the study files may delay «إيقاف».
+      const { ask } = await abortable(import("../ai/run.ts"), current.signal);
       const meta = await ask(
         {
           chip,
@@ -227,6 +312,7 @@ export default function AiPanel({
             setView((v) => (v.s === "loading" ? { ...v, thinking: true } : v));
           },
         },
+        () => recordAttempt(storage, date),
       );
       model = meta.model || model;
       truncated ||= meta.finish === "length";
@@ -237,28 +323,23 @@ export default function AiPanel({
       if (reason === "unmount") return;
       const failure = error instanceof AiError ? error : new AiError("network");
       model = failure.model ?? model;
-      const partial = cleanAnswer(raw).slice(0, MAX_TEXT) || undefined;
+      const partial = clip(cleanAnswer(raw), MAX_TEXT) || undefined;
       setStatus("");
       if (reason === "stop") {
-        setView(
-          partial
-            ? { s: "error", chip, problem: "stopped", partial, model }
-            : { s: "idle" },
-        );
+        if (partial)
+          setView({ s: "error", chip, problem: "stopped", partial, model, n });
+        else {
+          setView({ s: "idle" });
+          setStatus("أُوقفت الإجابة.");
+        }
         return;
       }
       if (partial) {
-        setView({ s: "error", chip, problem: failure.kind, partial, model });
+        setView({ s: "error", chip, problem: failure.kind, partial, model, n });
         return;
       }
-      if (failure.kind === "quota") quotaReached = true;
-      else if (failure.kind === "rate")
-        coolUntil = Math.max(Date.now() + 30000, failure.retryAt ?? 0);
-      else if (RETRYABLE.has(failure.kind)) {
-        failures += 1;
-        coolUntil = Date.now() + (failures === 1 ? 5000 : 15000);
-      }
-      setView({ s: "error", chip, problem: failure.kind });
+      backOff(failure.kind, failure.retryAt);
+      setView({ s: "error", chip, problem: failure.kind, n });
     } finally {
       cancelAnimationFrame(frame);
       if (controller.current === current) controller.current = null;
@@ -271,29 +352,6 @@ export default function AiPanel({
     if (text.length >= QUESTION_MIN && !busy)
       void run("ask", { fresh: true, question: text });
   }
-
-  if (!consent)
-    return (
-      <div className="ai">
-        <p className="ai-consent">
-          تُرسَل الآية وسياقها (وسؤالك إن كتبته) إلى خدمة OpenRouter، التي ترى
-          عنوان IP الخاص بك، ثم إلى مزوّد النموذج (Google أو غيره)، الذي قد
-          يحتفظ بالنص ويستخدمه لتحسين نماذجه وقد يطّلع عليه مراجعون. لا يُرسَل
-          اسمك أو تقدّمك. الإجابات آلية وقد تحتوي أخطاء.
-        </p>
-        <button
-          type="button"
-          className="primary"
-          onClick={() => {
-            giveConsent(storage);
-            setConsent(true);
-            requestAnimationFrame(() => firstChip.current?.focus());
-          }}
-        >
-          متابعة
-        </button>
-      </div>
-    );
 
   const chip = view.s === "idle" ? undefined : view.chip;
   const text =
@@ -310,156 +368,213 @@ export default function AiPanel({
   const reference = `${passage.book} ${passage.chapter}:${verse.number}`;
   const asking =
     chip === "ask" ? `سؤال: ${asked}` : CHIPS.find((c) => c.id === chip)?.label;
-  const report = text
-    ? `mailto:${APP_INFO.email}?subject=${encodeURIComponent(
-        "خطأ في إجابة الذكاء الاصطناعي",
-      )}&body=${encodeURIComponent(
-        [
-          `المرجع: ${reference}`,
-          `الطلب: ${asking ?? ""}`,
-          `النموذج: ${modelLabel(model)}`,
-          `إصدار الطلب: ${PROMPT_VERSION}`,
-          "",
-          text.slice(0, 1500),
-        ].join("\n"),
-      )}`
-    : undefined;
-  const coolingNow = Date.now() < coolUntil;
+  const report =
+    text && !busy
+      ? `mailto:${APP_INFO.email}?subject=${encodeURIComponent(
+          "خطأ في إجابة الذكاء الاصطناعي",
+        )}&body=${encodeURIComponent(
+          wellFormed(
+            [
+              `المرجع: ${reference}`,
+              `الطلب: ${asking ?? ""}`,
+              `النموذج: ${modelLabel(model)}`,
+              `إصدار الطلب: ${PROMPT_VERSION}`,
+              "",
+              clip(text, 1500),
+            ].join("\n"),
+          ),
+        )}`
+      : undefined;
+  // A request the guards would refuse: offer no button for it (it would only
+  // replace the answer with an error), or a disabled one during a cooldown.
+  const blocked =
+    busy || view.s === "idle" ? undefined : refusal(storage, today());
+  const final = blocked !== undefined && blocked !== "rate";
+  const waiting = blocked === "rate";
 
   return (
-    <div className="ai">
-      <div className="ai-chips" role="group" aria-label="اختر نوع الشرح">
-        {CHIPS.map((c, index) => (
+    <div
+      className="ai"
+      ref={root}
+      onFocus={(event) => {
+        lastFocus.current = event.target;
+      }}
+      onBlur={(event) => {
+        // Focus leaving the card (or the page) was the reader's choice.
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          lastFocus.current = null;
+      }}
+    >
+      {!consent ? (
+        <>
+          <p className="ai-consent">
+            تُرسَل الآية وسياقها (وسؤالك إن كتبته) إلى خدمة OpenRouter، التي ترى
+            عنوان IP الخاص بك، ثم إلى مزوّد النموذج (Google أو غيره)، الذي قد
+            يحتفظ بالنص ويستخدمه لتحسين نماذجه وقد يطّلع عليه مراجعون. لا يُرسَل
+            اسمك أو تقدّمك. الإجابات آلية وقد تحتوي أخطاء.
+          </p>
           <button
-            key={c.id}
-            ref={index === 0 ? firstChip : undefined}
+            ref={proceedButton}
             type="button"
-            className="ai-chip"
-            aria-pressed={chip === c.id}
-            aria-disabled={busy || undefined}
-            onClick={() => !busy && void run(c.id)}
+            className="primary"
+            onClick={() => {
+              giveConsent(storage);
+              setConsent(true);
+              // Safari does not focus clicked buttons, so move focus explicitly.
+              requestAnimationFrame(() =>
+                chipButtons.current[CHIPS[0].id]?.focus(),
+              );
+            }}
           >
-            {c.label}
+            متابعة
           </button>
-        ))}
-      </div>
-      <form className="ai-ask" onSubmit={submitQuestion}>
-        <label htmlFor={`${id}-question`}>اكتب سؤالك عن هذه الآية</label>
-        <div className="ai-ask-row">
-          <input
-            id={`${id}-question`}
-            type="text"
-            dir="auto"
-            maxLength={QUESTION_MAX}
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            enterKeyHint="send"
-            autoComplete="off"
-          />
-          <button
-            type="submit"
-            className="quiet-button"
-            aria-disabled={
-              busy || questionText.length < QUESTION_MIN || undefined
-            }
-          >
-            اسأل
-          </button>
-        </div>
-        <p className="ai-note">لا تكتب معلومات شخصية.</p>
-      </form>
+        </>
+      ) : (
+        <>
+          <div className="ai-chips" role="group" aria-label="اختر نوع الشرح">
+            {CHIPS.map((c) => (
+              <button
+                key={c.id}
+                ref={(element) => {
+                  chipButtons.current[c.id] = element;
+                }}
+                type="button"
+                className="ai-chip"
+                aria-pressed={chip === c.id}
+                aria-disabled={busy || undefined}
+                onClick={() => !busy && void run(c.id)}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <form className="ai-ask" onSubmit={submitQuestion}>
+            <label htmlFor={`${id}-question`}>اكتب سؤالك عن هذه الآية</label>
+            <div className="ai-ask-row">
+              <input
+                id={`${id}-question`}
+                type="text"
+                dir="auto"
+                maxLength={QUESTION_MAX}
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+                enterKeyHint="send"
+                autoComplete="off"
+              />
+              <button
+                ref={askButton}
+                type="submit"
+                className="quiet-button"
+                aria-disabled={
+                  busy || questionText.length < QUESTION_MIN || undefined
+                }
+              >
+                اسأل
+              </button>
+            </div>
+            <p className="ai-note">لا تكتب معلومات شخصية.</p>
+          </form>
 
-      {view.s !== "idle" && (
-        <div className="ai-answer" ref={answerRef} aria-busy={busy}>
-          {view.s === "loading" && (
-            <p className="ai-progress">
-              <AiSpark size={14} />
-              {view.thinking ? "النموذج يفكّر…" : "جارٍ إعداد الإجابة…"}
-            </p>
-          )}
-          {text && <AiAnswer blocks={parseAnswer(text)} />}
-          {view.s === "error" && (
-            <div className="ai-error" role="alert">
-              <p>
-                {view.partial && view.problem !== "stopped"
-                  ? "انقطعت الإجابة قبل اكتمالها."
-                  : MESSAGES[view.problem]}
-              </p>
-              {(view.partial || RETRYABLE.has(view.problem)) && (
+          {view.s !== "idle" && (
+            <div className="ai-answer" ref={answerRef} aria-busy={busy}>
+              {view.s === "loading" && (
+                <p className="ai-progress">
+                  <AiSpark size={14} />
+                  {view.thinking ? "النموذج يفكّر…" : "جارٍ إعداد الإجابة…"}
+                </p>
+              )}
+              {text && <AiAnswer blocks={parseAnswer(text)} />}
+              {view.s === "error" && (
+                <div className="ai-error" role="alert" key={view.n}>
+                  <p>
+                    {view.partial && view.problem !== "stopped"
+                      ? "انقطعت الإجابة قبل اكتمالها."
+                      : MESSAGES[view.problem]}
+                  </p>
+                  {(view.partial || RETRYABLE.has(view.problem)) && !final && (
+                    <button
+                      ref={retryButton}
+                      type="button"
+                      className="quiet-button"
+                      aria-disabled={waiting || undefined}
+                      onClick={() =>
+                        !waiting &&
+                        void run(view.chip, { fresh: true, question: asked })
+                      }
+                    >
+                      <RefreshCw size={17} aria-hidden="true" />
+                      إعادة المحاولة
+                    </button>
+                  )}
+                </div>
+              )}
+              {busy && (
                 <button
+                  ref={stopButton}
                   type="button"
-                  className="quiet-button"
-                  aria-disabled={coolingNow || undefined}
-                  onClick={() =>
-                    !coolingNow &&
-                    void run(view.chip, { fresh: true, question: asked })
-                  }
+                  className="text-button"
+                  onClick={() => controller.current?.abort("stop")}
                 >
-                  <RefreshCw size={17} aria-hidden="true" />
-                  إعادة المحاولة
+                  إيقاف
                 </button>
+              )}
+              {text && !busy && (
+                <div className="ai-footer">
+                  <p>
+                    إجابة مولَّدة بالذكاء الاصطناعي، قد تحتوي أخطاء ·{" "}
+                    <bdi dir="ltr">{modelLabel(model)}</bdi>
+                    {view.s === "done" &&
+                      view.truncated &&
+                      " (اختُصرت الإجابة لطولها)"}
+                  </p>
+                  <div className="ai-actions">
+                    {view.s === "done" && !final && (
+                      <button
+                        ref={anotherButton}
+                        type="button"
+                        className="text-button"
+                        aria-disabled={waiting || undefined}
+                        onClick={() =>
+                          !waiting &&
+                          void run(view.chip, { fresh: true, question: asked })
+                        }
+                      >
+                        إجابة أخرى
+                      </button>
+                    )}
+                    {report && (
+                      <a ref={reportLink} className="text-button" href={report}>
+                        الإبلاغ عن خطأ
+                      </a>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           )}
-          {busy && (
-            <button
-              type="button"
-              className="text-button"
-              onClick={() => controller.current?.abort("stop")}
-            >
-              إيقاف
-            </button>
-          )}
-          {text && !busy && (
-            <div className="ai-footer">
-              <p>
-                إجابة مولَّدة بالذكاء الاصطناعي، قد تحتوي أخطاء ·{" "}
-                <bdi dir="ltr">{modelLabel(model)}</bdi>
-                {view.s === "done" &&
-                  view.truncated &&
-                  " (اختُصرت الإجابة لطولها)"}
-              </p>
-              <div className="ai-actions">
-                {view.s === "done" && (
-                  <button
-                    type="button"
-                    className="text-button"
-                    onClick={() =>
-                      void run(view.chip, { fresh: true, question: asked })
-                    }
-                  >
-                    إجابة أخرى
-                  </button>
-                )}
-                {report && (
-                  <a className="text-button" href={report}>
-                    الإبلاغ عن خطأ
-                  </a>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
-      <p className="ai-note">
-        يُرسَل نص الآية وسياقها إلى خدمة ذكاء اصطناعي خارجية، دون اسمك أو
-        تقدّمك. المتبقي على هذا الجهاز اليوم:{" "}
-        {ar(Math.max(0, __AI_DAILY_CAP__ - used))} من {ar(__AI_DAILY_CAP__)}.
-      </p>
-      <button
-        type="button"
-        className="text-button ai-forget"
-        onClick={() => {
-          controller.current?.abort("unmount");
-          clearAiData(storage);
-          setConsent(false);
-          setView({ s: "idle" });
-          setStatus("");
-        }}
-      >
-        إيقاف الميزة ومسح بياناتها
-      </button>
+          <p className="ai-note">
+            يُرسَل نص الآية وسياقها إلى خدمة ذكاء اصطناعي خارجية، دون اسمك أو
+            تقدّمك. المتبقي على هذا الجهاز اليوم:{" "}
+            {ar(Math.max(0, __AI_DAILY_CAP__ - used))} من {ar(__AI_DAILY_CAP__)}
+            .
+          </p>
+          <button
+            type="button"
+            className="text-button ai-forget"
+            onClick={() => {
+              controller.current?.abort("unmount");
+              clearAiData(storage);
+              lastChip.current = null;
+              setConsent(false);
+              setView({ s: "idle" });
+              setStatus("");
+            }}
+          >
+            إيقاف الميزة ومسح بياناتها
+          </button>
+        </>
+      )}
       <p className="sr-only" role="status">
         {status}
       </p>
