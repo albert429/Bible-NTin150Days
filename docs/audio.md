@@ -104,6 +104,30 @@ charge. This is a usage allowance, not an unlimited free service. A custom domai
 has its own registration cost. See [current pricing](https://developers.cloudflare.com/r2/pricing/)
 and [public bucket configuration](https://developers.cloudflare.com/r2/buckets/public-buckets/).
 
+## Cloudflare Pages alternative
+
+Pages serves static files without byte ranges: a `Range` request receives the
+whole file with `200`. Safari and every iOS browser then refuse to play the
+audio, and other browsers cannot seek, so verse skipping jumps back to the start.
+[`cloudflare/audio-host/_worker.js`](../cloudflare/audio-host/_worker.js) fixes
+this. It serves `206` ranges of the uploaded files and the immutable caching above.
+
+1. Prepare an upload folder with the contents of `public/audio/days/` under
+   `audio/days/`, and copy `_worker.js` into its root, next to `audio/`.
+2. Deploy the folder to the Pages project, either by dashboard drag and drop
+   (which accepts `_worker.js`) or with
+   `npx wrangler pages deploy <folder> --project-name <project> --branch main`.
+   Pass the project's production branch: otherwise Wrangler uses the current Git
+   branch and makes a preview deployment.
+3. In Vercel, set `VITE_AUDIO_BASE_URL=https://<project>.pages.dev` for every
+   environment that should offer audio (Production, and Preview for branch
+   deployments), then redeploy. The value is read at build time.
+4. `curl -r 0-1 -sS -D - -o /dev/null https://<project>.pages.dev/audio/days/<file>`
+   must show `206` and `Content-Range: bytes 0-1/<size>`.
+
+The worker runs on every request to the project. The Workers Free plan allows
+100,000 requests a day; each listen makes a few, plus one per skipped verse.
+
 ## Vercel-only alternative
 
 Serve `public/audio/days/` from the deployment and leave `VITE_AUDIO_BASE_URL`
