@@ -9,3 +9,5 @@ package-lock.json
 data/books.json
 data/study/
 public/study/
+public/audio/
+data/audio/manifests/

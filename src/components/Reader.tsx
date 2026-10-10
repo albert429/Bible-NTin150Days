@@ -7,16 +7,26 @@ import {
   type CSSProperties,
   type MouseEvent,
   type PointerEvent,
+  type ReactNode,
+  lazy,
+  Suspense,
 } from "react";
-import { Check, RotateCcw } from "lucide-react";
+import { Check, RotateCcw, Headphones } from "lucide-react";
 import { ar } from "../format";
 import type { Day } from "../readings";
-import { Loading, LoadError } from "./Feedback";
+import { Loading, LoadError, ChunkBoundary } from "./Feedback";
 import PassageReference from "./PassageReference";
 import VerseStudy, { type StudyTarget } from "./VerseStudy";
 import { allowsReadingPrefetch } from "../useAdjacentPrefetch";
+const AudioPlayer = lazy(() => import("../audio/AudioPlayer"));
 
-const Scripture = memo(function Scripture({ reading }: { reading: Day }) {
+const Scripture = memo(function Scripture({
+  reading,
+  listen,
+}: {
+  reading: Day;
+  listen?: ReactNode;
+}) {
   return (
     <div className="scripture">
       {reading.passages.map((passage, index) => (
@@ -27,9 +37,12 @@ const Scripture = memo(function Scripture({ reading }: { reading: Day }) {
           tabIndex={-1}
           key={index}
         >
-          <h2 id={`passage-heading-${index}`}>
-            {passage.book} <PassageReference passage={passage} />
-          </h2>
+          <div className="passage-title-row">
+            <h2 id={`passage-heading-${index}`}>
+              {passage.book} <PassageReference passage={passage} />
+            </h2>
+            {index === 0 && listen}
+          </div>
           <div className="verse-text">
             {passage.verses?.map((verse) => (
               <Fragment key={verse.number}>
@@ -77,6 +90,8 @@ export default function Reader({
 }: Props) {
   const [target, setTarget] = useState<StudyTarget | null>(null);
   const [open, setOpen] = useState(false);
+  const [listening, setListening] = useState<number | null>(null);
+  const listenButton = useRef<HTMLButtonElement>(null);
   const press = useRef<{ t: number; x: number; y: number; selection: boolean }>(
     null,
   );
@@ -87,6 +102,7 @@ export default function Reader({
   useEffect(() => {
     setOpen(false);
     setTarget(null);
+    setListening(null);
   }, [reading?.day]);
 
   function onPointerDown(event: PointerEvent) {
@@ -154,11 +170,45 @@ export default function Reader({
         {error ? (
           <LoadError message={error} retry={retry} />
         ) : reading ? (
-          <Scripture reading={reading} />
+          <Scripture
+            reading={reading}
+            listen={
+              __AUDIO_DAYS__.includes(selected) ? (
+                <button
+                  ref={listenButton}
+                  className="listen-button"
+                  onClick={() => setListening(selected)}
+                  aria-label="استمع إلى قراءة اليوم"
+                  aria-pressed={listening === selected}
+                >
+                  <Headphones size={16} aria-hidden="true" /> استمع
+                </button>
+              ) : undefined
+            }
+          />
         ) : (
           <Loading />
         )}
       </article>
+      {listening === selected && reading && (
+        <div className="audio-launch">
+          <ChunkBoundary>
+            <Suspense fallback={<Loading label="جارٍ فتح المشغل…" />}>
+              <AudioPlayer
+                reading={reading}
+                onClose={() => {
+                  const trigger = listenButton.current;
+                  setListening(null);
+                  requestAnimationFrame(() => {
+                    if (trigger?.isConnected)
+                      trigger.focus({ preventScroll: true });
+                  });
+                }}
+              />
+            </Suspense>
+          </ChunkBoundary>
+        </div>
+      )}
       {target && reading && (
         <VerseStudy
           open={open}

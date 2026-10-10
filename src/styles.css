@@ -351,6 +351,40 @@ main.reading-main {
   display: inline;
   white-space: nowrap;
 }
+.passage-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.passage-title-row h2 {
+  flex: 1;
+}
+.listen-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--olive);
+}
+.audio-launch > .loading-state,
+.audio-launch > .load-error {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 25;
+  margin: 0;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+}
+.audio-launch .skeleton {
+  display: none;
+}
 .verse-text {
   font-family: Amiri, "Times New Roman", serif;
   font-size: var(--verse-size, 28px);
@@ -388,7 +422,8 @@ main.reading-main {
   background: none;
   font: inherit;
   color: inherit;
-  line-height: inherit;
+  /* Keep the visible number clickable without expanding Scripture line boxes. */
+  line-height: 1;
   cursor: pointer;
 }
 .verse-number:focus-visible {

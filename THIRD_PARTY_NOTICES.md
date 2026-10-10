@@ -39,3 +39,7 @@ The banner includes an eBible.org attribution and logo based on the [official lo
 React and React DOM use the MIT License; Lucide uses the ISC License. Each installed dependency retains its own license in the npm package. The lockfile records exact dependency versions. The application copyright notice does not override these licenses.
 
 The small React mark in About the app and the README is adapted from the [official React website's Logo component](https://github.com/reactjs/react.dev/blob/main/src/components/Logo.tsx), credited to Meta Platforms, Inc. and affiliates under MIT. It uses a restrained monochrome color. The [MIT notice is bundled](public/licenses/react-logo-MIT.txt).
+
+## Optional recorded Scripture
+
+User-supplied chapter audio is identified by its embedded metadata as Arabic Van Dyck — Audio Drama, © 1996 Bible Society of Egypt; ℗ 2008 Hosanna / Faith Comes By Hearing. The files are not included in Git. Their copyrights and any redistribution/adaptation permissions are separate from the public-domain eBible text. Neither this repository nor the availability of a download grants audio reuse rights. See [audio preparation and hosting](docs/audio.md).

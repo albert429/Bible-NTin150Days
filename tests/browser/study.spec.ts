@@ -136,6 +136,7 @@ test("selecting, long-pressing or dragging over Scripture opens nothing", async 
 
 test("keyboard users open a verse from its number and return to it", async ({
   page,
+  browserName,
 }) => {
   await seed(page);
   await page.goto("/");
@@ -143,12 +144,17 @@ test("keyboard users open a verse from its number and return to it", async ({
   const first = page
     .getByRole("button", { name: "تفاصيل الآية ١٤", exact: true })
     .first();
+  // macOS WebKit uses Option-Tab to visit all clickable items by default.
   for (
     let i = 0;
     i < 30 && !(await first.evaluate((el) => el === document.activeElement));
     i++
   )
-    await page.keyboard.press("Tab");
+    await page.keyboard.press(
+      process.platform === "darwin" && browserName === "webkit"
+        ? "Alt+Tab"
+        : "Tab",
+    );
   await expect(first).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog", { name: "متى ⁦٨: ١٤⁩" })).toBeVisible();

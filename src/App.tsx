@@ -285,6 +285,7 @@ export default function App() {
         )}
         {view === "read" ? (
           <Reader
+            key={member?.id || "guest"}
             selected={selected}
             reading={reading.data}
             error={reading.error}

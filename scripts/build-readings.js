@@ -17,3 +17,4 @@ for (const day of plan)
   writeFileSync(new URL(day.day + ".json", output), JSON.stringify(day));
 console.log(`Generated ${plan.length} static daily readings.`);
 import "./build-study.js";
+import "./build-audio-index.js";

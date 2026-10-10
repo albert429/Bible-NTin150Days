@@ -16,6 +16,7 @@ A calm Arabic New Testament reader built for the youth of the **Brethren Church 
 - A personal start date, a 150-day calendar, completion with undo, and multiple readers on one device.
 - Local progress, JSON backup/restore, and optional sharing initiated by the reader.
 - Static frontend hosting, daily reading caches, nearby readings prepared in the background, and secondary screens loaded on demand.
+- Optional recorded reading with verse highlighting, follow mode, and a small audio player; recordings load only when requested.
 
 <p align="center">
   <img src="docs/assets/mobile-reader.png" width="300" alt="Actual mobile app: a slim Arabic day toolbar followed immediately by Scripture" />
@@ -56,6 +57,8 @@ React, TypeScript, and Vite build a static `dist/` directory. Vercel settings ar
 Progress and appearance preferences stay in the current browser. There is no automatic account sync or live group tracking. Backups contain the reader's name, start date, and completed days; keep them private. Readings need a network connection on their first fetch; the app does not currently provide persistent offline access.
 
 See the [development guide](docs/development.md) for architecture, deployment troubleshooting, source regeneration, and performance checks. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before making changes.
+
+Recorded readings use separately hosted static audio. See the [audio guide](docs/audio.md) for local preparation, timing review, CDN setup, and free-tier bandwidth estimates. A normal Git-only deployment keeps audio hidden until media is available or an audio host is configured.
 
 ## Scripture attribution and rights
 
